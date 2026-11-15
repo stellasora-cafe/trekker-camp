@@ -38,12 +38,12 @@
    - 素材与代码分别提交。素材库的 `master` 更新在配置服务器后会自动同步 `public/`，未经授权不推送素材库 `master`。素材库的 Agent 规则与授权记录分别位于其 `AGENTS.md` 和 `RIGHTS.md`；不将 SSH 凭据加入任何仓库。
 
 7. **本站 VPS 使用部署 CLI**
-   - 生产部署只消费 `server-v*` 标签对应的已发布 GitHub Release，使用精简部署包和固定 digest 的容器镜像，不在服务器拉取主仓库。创建标签、发布 Release 与生产部署分别遵循用户授权。
+   - 服务端每次合并到 `master` 后自动生成干净的 Actions 构建产物；`camp update` 消费最新成功且未过期的服务端产物和固定 digest 的私有镜像，不在服务器拉取主仓库。桌面独立使用 `desktop-v*` 标签及公开 Release；生产部署仍需用户授权。
    - 运维入口和存储布局见 [DEPLOY.zh-CN.md](DEPLOY.zh-CN.md)。终端中直接运行 `camp` 打开交互菜单；Agent 自动化使用子命令。首次部署用 `camp install`，应用与素材更新用 `camp update`，CLI 自身更新用 `camp self-update`，版本用 `camp version` 查看。
    - 首次配置使用仓库随附的 Misskey Docker 示例模板，初始化调用 `pnpm run init`，Web 使用镜像默认 `migrateandstart` 入口；更新先备份、独立执行官方迁移，再启动并检查健康状态。保留已有实例配置和数据。
    - 启停使用 `camp start`、`camp stop`、`camp restart`；开机自启使用 `camp autostart on/off`，状态由 `camp status` 显示。保留数据目录中的 `.config/compose.autostart.yml`，启停和自启设置与更新、备份共用锁；不要通过停用整个 Docker 服务来关闭本站自启。
    - `--dir` 指定代码目录，未指定时使用 CLI 保存的 `deployment-dir`；自更新保留该记录。首次安装的 `--data-dir` 指定数据根目录，后续命令读取代码目录 `.config/data-dir`。保留已有数据位置，禁止通过修改路径标记或 Compose 挂载来代替数据迁移。
-   - 私有素材使用仅限该仓库读取的细粒度 PAT；CLI 在访问成功后保存到数据目录 `.config/github-token`（root `0600`），环境变量可提供替换值。保留已保存的 PAT，不依赖 `gh`，不输出凭据内容。
+   - 下载产物与私有素材使用选中主仓库、素材仓库并具有 Actions Read 和 Contents Read 的细粒度 PAT；CLI 在访问成功后保存到数据目录 `.config/github-token`（root `0600`），环境变量可提供替换值。保留已保存的 PAT，不依赖 `gh`，不输出凭据内容。私有 GHCR 镜像另用 classic PAT 的 read:packages 权限，拉取成功后保存到 `.config/ghcr-token`（root `0600`），Docker 登录配置仅临时存在。
    - 获得生产部署授权后，使用 CLI 完成素材同步、迁移前备份和健康检查；按 `camp status` 显示的实际路径操作。CLI 管理的素材工作副本由 `camp update` 更新，独立 rsync 发布使用独立挂载目录。
    - R2 备份使用同一数据根目录，每天北京时间 04:00 执行。CLI 更新需成套交付 `deploy.sh` 与 `backup.sh`，保留备份与更新共用锁、失败恢复和旧安装路径兼容。
    - 修改部署脚本、Compose 或 Caddy 时运行 `bash scripts/check-deploy.sh`；该入口由部署 CI 和 `node scripts/check-shipping.mjs` 共用，Windows 交付检查通过默认 WSL 发行版执行。公开 CI 使用临时数据和测试凭据。

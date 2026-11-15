@@ -1,6 +1,6 @@
 # 旅人营地 VPS 部署
 
-`scripts/deploy.sh` 为本站准备 Linux VPS、按已发布 Release 部署应用并同步私有素材。支持 **Ubuntu 22.04、24.04、26.04 LTS**，CPU 架构为 **amd64 / arm64**。宿主机使用 Bash、Python 3、Git、Git LFS 和 Docker，Node 与 pnpm 在镜像中安装。
+`scripts/deploy.sh` 为本站准备 Linux VPS、按 master 最新成功构建部署应用并同步私有素材。支持 **Ubuntu 22.04、24.04、26.04 LTS**，CPU 架构为 **amd64 / arm64**。宿主机使用 Bash、Python 3、Git、Git LFS 和 Docker，Node 与 pnpm 在镜像中安装。
 
 ## 首次部署
 
@@ -8,38 +8,36 @@
 
 在 Cloudflare 中将本站域名的 A / AAAA 记录指向 VPS，可以开启橙云代理；VPS 开放 TCP 80、443。Caddy 使用 Cloudflare DNS 验证自动申请并续期 HTTPS 证书。默认部署目录为 `/opt/trekker-camp`，应用端口只绑定 `127.0.0.1:3000`。
 
-使用可读取 `stellasora-cafe/trekker-camp-assets` 的 GitHub token。细粒度 token 选择该私有仓库并授予 **Contents: Read-only**；仓库读取权限说明见 [GitHub 文档](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)。服务端使用公开 Release 的精简部署包和 GHCR 镜像；私有素材仓库独立通过 HTTPS 拉取 `master`。GHCR 的 `trekker-camp` 与 `trekker-camp-caddy` 镜像应设为公开，使服务器无需额外的镜像仓库凭据。
+准备细粒度 GitHub PAT，选择主仓库 `stellasora-cafe/trekker-camp` 和素材仓库 `stellasora-cafe/trekker-camp-assets`，授予 **Actions: Read-only** 与 **Contents: Read-only**，供下载构建产物和读取私有素材。镜像保持私有，另准备仅带 **read:packages** 的 classic PAT，并确保其所属账号可读取 `trekker-camp` 和 `trekker-camp-caddy` 包；GHCR 暂不支持细粒度 PAT，见 [GitHub Container registry 认证说明](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry)。
 
 另准备一个仅授权本站域名的 Cloudflare API token，权限为 **Zone → Zone → Read** 和 **Zone → DNS → Edit**，供 Caddy DNS 插件管理验证记录，参见 [插件权限说明](https://github.com/caddy-dns/cloudflare#configuration)。Cloudflare 的 SSL/TLS 加密模式选择 [Full (strict)](https://developers.cloudflare.com/ssl/origin-configuration/ssl-modes/full-strict/)。DNS 验证可在橙云开启时进行。
 
-服务端版本发布后，在 VPS 执行（将版本号替换为已发布的 `server-v*` 标签）：
+master 的服务端构建成功后，在 VPS 执行：
 
 ```bash
 sudo -i
 apt-get update
 apt-get install -y ca-certificates curl python3
-release=server-v0.1.0
-curl -fsSL "https://raw.githubusercontent.com/stellasora-cafe/trekker-camp/$release/scripts/deploy.sh" -o /tmp/camp-deploy.sh
-bash /tmp/camp-deploy.sh install --release "$release" --url https://camp.example.com
+curl -fsSL "https://raw.githubusercontent.com/stellasora-cafe/trekker-camp/master/scripts/deploy.sh" -o /tmp/camp-deploy.sh
+bash /tmp/camp-deploy.sh install --url https://camp.example.com
 ```
 
-CLI 只接受 GitHub 已发布的服务端 Release，验证归档白名单、标签、提交号及镜像摘要后再生成配置。未指定 `--release` 时选择最新稳定 `server-v*` Release，忽略桌面版本、草稿和预发行版。开发分支和未发布标签不会被部署。
+CLI 只接受 `Server deployment artifact` 工作流在 `master` 上成功完成的构建；`camp update` 自动选择最新可下载产物，跳过失败、未完成、其他分支及已过期产物。可用 `--build <Actions运行编号>` 指定某次成功构建，仍需通过相同校验。
 
-安装包来自 Actions 的 `Server release` 工作流，固定下载 Release 附件 `camp-server-<tag>.tar.gz`。这个包按白名单生成，只含 Compose、配置模板、CLI、备份脚本、代理配置和镜像版本清单；CLI 解包前再次检查完整文件清单。GitHub 自动生成的源码 ZIP/TAR、整仓 clone、桌面工程、测试、`AGENTS.md`、本地配置和私有素材都不作为服务器安装包。Web 与 Caddy 使用同次 Actions 构建、固定 digest 的 GHCR 镜像。
+安装包来自 Actions artifact `camp-server`，内部只有 `camp-server.tar.gz`。部署包按白名单生成，只含 Compose、配置模板、CLI、备份脚本、代理配置和镜像版本清单；CLI 解包前核对完整文件清单、构建编号、提交号及固定镜像摘要。GitHub 源码 ZIP/TAR、整仓 clone、桌面工程、测试、`AGENTS.md`、本地配置和私有素材都不作为服务器安装包。Web 与 Caddy 使用同次 Actions 构建的私有 GHCR 镜像。
 
-### 现有服务器迁移到组织仓库与 Release 部署
+### 现有服务器迁移到组织仓库与构建产物部署
 
 本次服务端版本保留桌面浏览器授权、设备会话、版本兼容检查与前端资源接口。桌面程序可以在服务端发布后单独进行真实连接测试和发布，无需同步发布安装器。
 
-将服务端 PR 合入 `master` 并完成检查后，在该提交创建与两个 `package.json` 版本一致的 `server-v*` 标签。发布工作流拒绝未合入 `master` 的提交；构建多架构镜像和精简部署包后生成草稿 Release，检查完成并正式发布后 CLI 才会安装。桌面版本使用独立发布流程。
+服务端 PR 合入 `master` 后自动构建，不创建服务端标签或 Release；成功产物才会被 CLI 选中。桌面版本继续使用 `desktop-v*` 标签并发布公开 Release。
 
-对于此前从 `HePudding` 仓库 clone 并部署的服务器，首次升级使用新组织的固定版本引导脚本。先查看 `camp status` 确认现有部署目录，再执行（替换为实际发布标签）：
+此前从旧仓库 clone 部署的服务器，先查看 `camp status` 确认现有部署目录，再更新引导脚本及 CLI：
 
 ```bash
-release=server-v0.1.0
-curl -fsSL "https://raw.githubusercontent.com/stellasora-cafe/trekker-camp/$release/scripts/deploy.sh" -o /tmp/camp-deploy.sh
-sudo bash /tmp/camp-deploy.sh self-update --release "$release"
-sudo camp update --release "$release"
+curl -fsSL "https://raw.githubusercontent.com/stellasora-cafe/trekker-camp/master/scripts/deploy.sh" -o /tmp/camp-deploy.sh
+sudo bash /tmp/camp-deploy.sh self-update
+sudo camp update
 sudo camp status
 ```
 
@@ -50,9 +48,9 @@ sudo camp status
 安装自动完成：
 
 1. 检测 Ubuntu 版本，安装缺少的 Git / Git LFS 等工具；没有 Docker 时通过官方 APT 源安装 Docker Engine、Compose 和 Buildx。版本对应 `jammy` / `noble` / `resolute`，依据 [Docker Ubuntu 安装文档](https://docs.docker.com/engine/install/ubuntu/)。已有可用 Docker 会被复用。
-2. 下载精简 Release 到部署目录的 `.releases/`；单独拉取私有素材，仅下载 `public/` 下的 LFS 文件。
+2. 下载精简构建产物到部署目录的 `.releases/`；单独拉取私有素材，仅下载 `public/` 下的 LFS 文件。
 3. 从仓库随附的 `.config/docker_example.yml` 和 `.config/docker_example.env` 生成配置，填入域名、随机数据库密码和独立的随机管理员初始化密码 `setupPassword`，保留官方模板的其他默认值与注释；生成 Caddy / Cloudflare DNS 配置，将 `compose.vps.yml` 复制为本站的 `compose.yml`。
-4. 拉取 Release 固定摘要的应用及包含 Cloudflare 插件的 Caddy 镜像，验证代理配置，启动 PostgreSQL 18 和 Redis，备份数据库与配置，运行 `pnpm run init` 初始化数据库。
+4. 认证并拉取构建清单固定摘要的应用及包含 Cloudflare 插件的 Caddy 镜像，验证代理配置，启动 PostgreSQL 18 和 Redis，备份数据库与配置，运行 `pnpm run init` 初始化数据库。
 5. 挂载素材，以镜像默认的 `node apps/misskey/scripts/start.mjs --migrate` 启动应用，等待容器健康检查和本机 HTTPS `/healthz` 检查成功。
 
 首次打开站点时，输入 CLI 显示的 **初始化密码**，再自行设置管理员用户名和登录密码。初始化密码在应用启动前生成并写入数据目录的 `.config/default.yml`，使用 24 字节随机数；空白或错误的密码会被拒绝。尚未完成管理员创建时，安装完成输出、`camp status` 和菜单中的“查看站点状态”会显示该密码；管理员创建完成后只显示完成状态。已有部署的配置和管理员账号保持原样，更新与 CLI 自更新不会补写或更换初始化密码。站点创建后保持配置中的 `url` 不变。
@@ -87,16 +85,17 @@ bash /tmp/camp-deploy.sh install --url https://camp.example.com --data-dir /srv/
 
 后续 `camp update`、`camp backup` 和定时任务自动读取该位置，`camp status` 显示实际路径。已有安装继续使用原目录；传入不同的 `--data-dir` 会停止操作，数据位置变更需安排停机迁移。Docker 引擎自身的镜像存储仍由宿主机 Docker 配置管理。
 
-## 发布服务端版本
+## 服务端自动构建
 
-通过 `server-vX.Y.Z` 标签发布，例如 `server-v0.1.0`；标签版本须与根目录及 `apps/misskey/package.json` 的 `version` 一致。`.github/workflows/server-release.yml` 在标签上构建 amd64 / arm64 的应用与 Caddy 镜像，并创建 GitHub Release 草稿。维护者检查产物后发布草稿，服务器才能获取它。桌面版本使用独立的 `desktop-v*` 标签，互不影响。
+每次 PR 合并到 `master` 后，`.github/workflows/server-release.yml` 自动构建 amd64 / arm64 应用与 Caddy 镜像，最后上传 Actions artifact `camp-server`。服务端不需要 tag 或 Release；应用版本为 `0.1.0`，每次部署通过 Actions 构建编号和完整提交号区分。桌面仍独立使用 `desktop-v*` 标签及公开 Release。
 
-Release 附件 `camp-server-server-vX.Y.Z.tar.gz` 只包含部署 CLI、Compose、示例配置及 `RELEASE.json`，不含私有素材、字体、图片、凭据、Git 工作副本或代理说明文件。镜像在 `compose.release.yml` 中固定到 digest，不依赖可变的 `latest` 标签。完整对应源码仍由同一 Git 标签、GitHub 源码归档及应用内源码下载提供；私有素材不进入这些源码包。
+`camp-server.tar.gz` 仅含部署 CLI、Compose、示例配置和 `RELEASE.json`。镜像在 `compose.release.yml` 中固定到 digest，不依赖可变标签。对应源码可通过清单中的提交号和应用内源码下载获取。构建产物保留 90 天；若所有成功产物均已过期，可在 `master` 上手动运行该工作流重新生成。
 
-VPS 保存每次候选版本到 `.releases/`。下载、校验和镜像预检失败时，现有版本记录保持不变；数据库备份成功后，在迁移前原子记录 `.config/server-release`，确保后续启动使用同一版应用。迁移失败时保持停站，不自动用旧应用连接已变更的数据库。旧版本目录与更新前备份保留，回滚数据库由维护者明确操作。
+VPS 将候选版本保存到 `.releases/`。下载、校验和镜像预检失败时，现有版本记录保持不变；备份成功后，在迁移前原子记录 `.config/server-release`，确保后续启动使用同一版应用。迁移失败保持停站，不自动用旧应用连接已变更的数据库。旧版本目录与备份继续保留。
 
 ```bash
-sudo camp update --release server-v0.1.0
+sudo camp update                  # 最新可下载的成功构建
+sudo camp update --build 12345678 # 指定成功构建的 Actions 运行编号
 ```
 
 ## 更新与日常操作
@@ -146,7 +145,7 @@ sudo camp autostart             # 查看 Docker 和各服务的开机自启状�
 
 ### 更新应用与素材
 
-`update` 获取独占锁后立即停止旧应用并进入维护状态，再读取凭据、下载精简部署包、拉取和验证固定摘要镜像、同步素材、备份数据库及执行迁移。新应用启动自检期间仍不开放页面、API 或实时连接；CLI 更新、旧源码归档和 HTTPS 检查完成后才解除维护状态。素材清单中的新增表情会在应用启动时自动注册。数据库、上传文件、配置和证书持续保存在原有目录 / Docker 卷中。
+`update` 获取独占锁后立即停止旧应用并进入维护状态，再读取凭据、下载最新成功构建的精简部署包、拉取和验证固定摘要镜像、同步素材、备份数据库及执行迁移。新应用启动自检期间仍不开放页面、API 或实时连接；CLI 更新、旧源码归档和 HTTPS 检查完成后才解除维护状态。素材清单中的新增表情会在应用启动时自动注册。数据库、上传文件、配置和证书持续保存在原有目录 / Docker 卷中。
 
 Node 大版本随新镜像一起升级，构建与运行阶段使用 Dockerfile 中的同一版本，pnpm 按根目录 `package.json` 的 `packageManager` 安装。依赖在镜像内重新安装，宿主机的 Node、pnpm 和旧容器的 `node_modules` 不参与新容器运行。CLI 在维护期间核对新镜像中的 Node / pnpm 版本，并实际加载图像处理、正则匹配和其他核心原生依赖；版本或原生模块加载失败时终止更新并保持维护状态。
 
@@ -171,7 +170,7 @@ sudo camp self-update
 camp version
 ```
 
-`self-update` 下载已发布服务端 Release 的精简部署包，从同一包中取出 `deploy.sh` 和 `backup.sh`，检查文件清单、版本与 Bash 语法，再原子切换命令入口；也可通过 `--release server-v版本号` 指定版本。下载或检查失败时保留旧 CLI。该命令独立于应用部署，不需要 GitHub token 或 Docker，也不需要先安装站点；运行中的站点保持原状。
+`self-update` 从最新成功构建产物成套取出 `deploy.sh` 和 `backup.sh`，检查文件清单、构建身份与 Bash 语法后原子切换入口；也可用 `--build <运行编号>` 指定构建。下载或检查失败时保留旧 CLI。该命令需要主仓库 Actions 读取凭据，无需 Docker；运行中的站点保持原状。
 
 CLI 成套安装到 `/usr/local/lib/trekker-camp/<提交号>-<随机后缀>/`，`current` 指向当前版本，`/usr/local/bin/camp` 是命令入口。`camp version` 显示工具提交号；备份模块从同一版本目录加载。成功执行应用 `camp update` 后，也会成套安装该应用提交携带的 CLI。自更新与部署、备份共用操作锁。
 
@@ -179,7 +178,7 @@ CLI 成套安装到 `/usr/local/lib/trekker-camp/<提交号>-<随机后缀>/`，
 
 ### GitHub PAT 保存与更换
 
-GitHub 认证依次使用 `GH_TOKEN`、`GITHUB_TOKEN`、数据目录的 `.config/github-token`，都没有时在终端隐藏询问。使用仅授权 `stellasora-cafe/trekker-camp-assets`、权限为 **Contents: Read-only** 的细粒度 PAT（`github_pat_` 开头）。CLI 不读取 `gh` 登录状态。
+GitHub 认证依次使用 `GH_TOKEN`、`GITHUB_TOKEN`、数据目录的 `.config/github-token`，都没有时在终端隐藏询问。使用选中主仓库和素材仓库、权限为 **Actions: Read-only** 与 **Contents: Read-only** 的细粒度 PAT（`github_pat_` 开头）。CLI 不读取 `gh` 登录状态。
 
 首次安装或更新成功读取私有素材及 LFS 文件后，CLI 自动保存本次 PAT。重开终端、服务器重启和 `camp self-update` 后继续使用该文件。PAT 以明文存放在宿主机的独立文件中，仅 root 可读写；与站点配置一起纳入本地配置备份和 R2 加密备份。
 
@@ -193,9 +192,11 @@ sudo --preserve-env=GH_TOKEN camp update
 unset GH_TOKEN
 ```
 
-也可由部署系统的 Secret 环境变量提供 `GH_TOKEN`。CLI 通过临时 `GIT_ASKPASS` 向 Git / Git LFS 提供凭据，PAT 不写入仓库 URL、Git 配置、日志或镜像，临时 helper 不含 PAT，运行结束后删除。`status`、`logs`、启停、自启管理和 CLI 自更新不需要 GitHub PAT。
+也可由部署系统的 Secret 环境变量提供 `GH_TOKEN`。CLI 通过临时 `GIT_ASKPASS` 向 Git / Git LFS 提供凭据，PAT 不写入仓库 URL、Git 配置、日志或镜像，临时 helper 不含 PAT，运行结束后删除。`status`、`logs`、启停及自启管理不需要 GitHub PAT。
 
-Cloudflare token 在首次安装时从 `CLOUDFLARE_API_TOKEN` 或隐藏输入读取，保存在仅 root 可读写的 `.config/cloudflare.env`，只注入 Caddy 容器，用于证书续期；普通更新沿用该文件。轮换 token 时更新此文件后执行 `camp update`。首次无人值守安装可使用 `sudo --preserve-env=GH_TOKEN,CLOUDFLARE_API_TOKEN bash /tmp/camp-deploy.sh install --url https://camp.example.com`。
+私有镜像认证依次读取 `GHCR_TOKEN`、数据目录 `.config/ghcr-token`，缺失时隐藏询问 classic PAT（`read:packages`）。CLI 获取令牌对应用户名，通过标准输入登录 GHCR；Docker 凭据只保存在临时目录，操作结束即清除。两个镜像均拉取成功后才保存令牌，权限 root `0600`，失败保留旧令牌。无人值守安装/更新需同时保留 `GH_TOKEN,GHCR_TOKEN` 环境变量。
+
+Cloudflare token 在首次安装时从 `CLOUDFLARE_API_TOKEN` 或隐藏输入读取，保存在仅 root 可读写的 `.config/cloudflare.env`，只注入 Caddy 容器，用于证书续期；普通更新沿用该文件。轮换 token 时更新此文件后执行 `camp update`。首次无人值守安装可使用 `sudo --preserve-env=GH_TOKEN,GHCR_TOKEN,CLOUDFLARE_API_TOKEN bash /tmp/camp-deploy.sh install --url https://camp.example.com`。
 
 ### 目录和备份
 
@@ -207,7 +208,8 @@ Cloudflare token 在首次安装时从 `CLOUDFLARE_API_TOKEN` 或隐藏输入读
 | `/opt/trekker-camp/.config/docker.env` | PostgreSQL 初始化凭据，仅 root 可读写 |
 | `/opt/trekker-camp/.config/Caddyfile` | HTTPS 反向代理配置 |
 | `/opt/trekker-camp/.config/cloudflare.env` | 证书申请 / 续期的 Cloudflare token，仅 root 可读写 |
-| `/opt/trekker-camp/.config/github-token` | 私有素材仓库的细粒度 PAT，仅 root 可读写 |
+| `/opt/trekker-camp/.config/ghcr-token` | 私有镜像的 classic PAT（read:packages），仅 root 可读写 |
+| `/opt/trekker-camp/.config/github-token` | Actions 构建产物与私有素材的细粒度 PAT，仅 root 可读写 |
 | `/opt/trekker-camp/private-assets/public/` | 运行时只读挂载的私有素材 |
 | `/opt/trekker-camp/files/` | 上传文件 |
 | `/opt/trekker-camp/db/`、`redis/` | 数据库和 Redis 数据 |

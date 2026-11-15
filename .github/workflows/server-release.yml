@@ -1,16 +1,16 @@
-name: Server release
+name: Server deployment artifact
 
 on:
   push:
-    tags: ['server-v*']
+    branches: [master]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   packages: write
 
 concurrency:
-  group: server-release-${{ github.ref }}
+  group: server-deployment-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -20,14 +20,13 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
-      - name: Validate release tag
+      - name: Validate deployment source
         shell: bash
         run: |
-          [[ "$GITHUB_REF" =~ ^refs/tags/server-v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]
-          test "$(git rev-parse HEAD)" = "$(git rev-parse "$GITHUB_REF^{commit}")"
+          test "$GITHUB_REF" = refs/heads/master
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git fetch --no-tags origin master
           git merge-base --is-ancestor HEAD origin/master
-          python3 -c 'import json,os; expected=os.environ["GITHUB_REF_NAME"].removeprefix("server-v"); assert all(json.load(open(p))["version"] == expected for p in ("package.json", "apps/misskey/package.json")), "Release tag must match package versions"'
       - name: Verify deployment and release bundle
         shell: bash
         run: |
@@ -47,7 +46,7 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ghcr.io/stellasora-cafe/trekker-camp:${{ github.ref_name }}
+          tags: ghcr.io/stellasora-cafe/trekker-camp:build-${{ github.run_id }}-${{ github.run_attempt }}
           labels: org.opencontainers.image.source=https://github.com/stellasora-cafe/trekker-camp
       - uses: docker/build-push-action@v7
         id: caddy
@@ -55,17 +54,16 @@ jobs:
           context: scripts/caddy
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ghcr.io/stellasora-cafe/trekker-camp-caddy:${{ github.ref_name }}
+          tags: ghcr.io/stellasora-cafe/trekker-camp-caddy:build-${{ github.run_id }}-${{ github.run_attempt }}
           labels: org.opencontainers.image.source=https://github.com/stellasora-cafe/trekker-camp
       - name: Package deployment files
         env:
           WEB_IMAGE: ghcr.io/stellasora-cafe/trekker-camp@${{ steps.web.outputs.digest }}
           CADDY_IMAGE: ghcr.io/stellasora-cafe/trekker-camp-caddy@${{ steps.caddy.outputs.digest }}
-        run: python3 scripts/build-server-release.py --tag "$GITHUB_REF_NAME" --web "$WEB_IMAGE" --caddy "$CADDY_IMAGE"
-      - name: Create draft release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "${GITHUB_REF_NAME#server-v}" --generate-notes
-          gh release upload "$GITHUB_REF_NAME" "release/camp-server-$GITHUB_REF_NAME.tar.gz"
+        run: python3 scripts/build-server-release.py --run-id "$GITHUB_RUN_ID" --web "$WEB_IMAGE" --caddy "$CADDY_IMAGE"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: camp-server
+          path: release/camp-server.tar.gz
+          if-no-files-found: error
+          retention-days: 90
