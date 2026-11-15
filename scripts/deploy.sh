@@ -637,6 +637,7 @@ if (meta.requireSetup) {
 }
 
 check_https() {
+	local path=${1:-/healthz}
 	stage='检查 HTTPS 入口'
 	site_url=$(sed -n 's/^url:[[:space:]]*//p' "$config_dir/default.yml")
 	log '等待 HTTPS 入口就绪；首次申请证书可能需要几分钟。'
@@ -646,14 +647,15 @@ check_https() {
 		error_log=$(mktemp "${TMPDIR:-/tmp}/camp-https-XXXXXX")
 		trap 'rm -f -- "$error_log"' EXIT
 		if ! curl --fail --silent --show-error --output /dev/null --retry 60 --retry-max-time 300 --retry-delay 5 --retry-all-errors \
-			--connect-timeout 5 --max-time 10 --resolve "${site_url#https://}:443:127.0.0.1" "$site_url/healthz" 2> "$error_log"; then
+			--connect-timeout 5 --max-time 10 --resolve "${site_url#https://}:443:127.0.0.1" "$site_url$path" 2> "$error_log"; then
 			tail -n 1 "$error_log" >&2
-			fail "HTTPS 入口等待超时。请运行 camp logs --dir \"$camp_dir\" 查看证书或 DNS 验证错误；修复后用 camp start --dir \"$camp_dir\" 重新检查。"
+			fail "HTTPS 入口等待超时。请运行 camp logs --dir \"$camp_dir\" 查看证书或 DNS 验证错误；修复后重试本次操作。"
 		fi
 	)
 }
 
 start_site() {
+	[[ ! -e $config_dir/maintenance/updating ]] || fail '上次更新尚未完成，请修复报错后运行 camp update；当前保持维护状态。'
 	stage='启动站点并检查健康状态'
 	compose config --quiet
 	compose up -d --no-build --pull never --wait --wait-timeout 180
@@ -667,6 +669,25 @@ stop_site() {
 	compose up -d --no-deps --no-build --pull never caddy
 	compose stop --timeout 60 web db redis
 	log '应用已停止，维护页入口、容器和数据已保留。'
+}
+
+begin_update_maintenance() {
+	local container_ids
+	local containers=()
+	stage='停止旧应用并进入维护状态'
+	install -d -m 0755 "$config_dir/maintenance"
+	: > "$config_dir/maintenance/updating"
+	# The currently installed proxy may predate the gate. Keep the old app stopped
+	# across a Docker/host restart until recreation applies the saved restart policy.
+	container_ids=$(compose ps --all --quiet web)
+	if [[ -n $container_ids ]]; then
+		mapfile -t containers <<< "$container_ids"
+		docker update --restart=no "${containers[@]}" >/dev/null
+	fi
+	# Stop before credentials, downloads or asset synchronization can delay the update.
+	compose stop --timeout 60 web
+	compose up -d --no-deps --no-build --pull never caddy
+	log '旧应用已停止；更新完成前持续显示维护页。'
 }
 
 use_image_start_command() (
@@ -794,7 +815,7 @@ PY
 }
 
 deploy() {
-	local action=$1 maintenance_upgrade=0
+	local action=$1 maintenance_upgrade=0 probe_path=/healthz
 	stage='配置 CDN 访客 IP 识别'
 	prepare_cdn
 	stage='准备 Release 镜像'
@@ -849,7 +870,12 @@ deploy() {
 	fi
 	stage='启动 HTTPS 入口'
 	compose up -d --wait --wait-timeout 60 caddy
-	check_https
+	# Validate TLS while the application is still hidden behind the maintenance gate.
+	if [[ -e $config_dir/maintenance/updating ]]; then probe_path=/__camp-maintenance/v1.html; fi
+	if ! check_https "$probe_path"; then
+		compose stop web
+		fail 'HTTPS 检查失败，应用已停止并保持维护状态。'
+	fi
 	stage='安装 camp 命令'
 	if [[ -n ${release_source:-} ]]; then
 		install_cli "$release_source/scripts" "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["commit"])' "$release_source/RELEASE.json")" /usr/local "$camp_dir"
@@ -858,6 +884,15 @@ deploy() {
 	fi
 	stage='归档旧源码工作副本'
 	archive_legacy_checkout "$backup_dir"
+	if [[ -e $config_dir/maintenance/updating ]]; then
+		stage='恢复站点访问'
+		rm -- "$config_dir/maintenance/updating"
+		if ! check_https; then
+			: > "$config_dir/maintenance/updating"
+			compose stop web
+			fail '站点入口检查失败，已恢复维护状态并停止应用。'
+		fi
+	fi
 	log "部署完成：$site_url。数据目录：$data_dir。使用 camp status 查看状态，camp logs 查看日志。"
 	compose ps
 	show_setup_status
@@ -960,6 +995,7 @@ main() {
 		stop) stop_site; return ;;
 		autostart) set_autostart "$autostart_mode"; return ;;
 	esac
+	if [[ $action == update ]]; then begin_update_maintenance; fi
 	stage='读取 GitHub 凭据'
 	prepare_auth
 	stage='读取 Cloudflare 凭据'

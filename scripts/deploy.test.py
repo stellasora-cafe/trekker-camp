@@ -566,14 +566,17 @@ compose() {
 }
 curl() {
   printf 'https %s\n' "$*" >> "$TEST_ROOT/events"
+  if [[ $FAILURE == final-https && $* == *'/healthz'* ]]; then return 42; fi
   [[ $FAILURE != https ]]
 }
 git() { printf '%040d\n' 1; }
 install_cli() {
   [[ ${4:-} == "$camp_dir" ]] || fail 'deployment directory must be saved with the CLI'
+  if [[ $TEST_ACTION == update ]]; then [[ -f $config_dir/maintenance/updating ]] || fail 'maintenance must cover CLI installation'; fi
   printf 'install-cli\n' >> "$TEST_ROOT/events"
 }
 release_source=$TEST_RELEASE_DIR
+if [[ $TEST_ACTION == update ]]; then begin_update_maintenance; fi
 deploy "$TEST_ACTION"
 ''', success=not failure)
         return checkout, (self.root / "events").read_text().splitlines(), result
@@ -583,6 +586,8 @@ deploy "$TEST_ACTION"
         self.assertIn("pull web caddy", events)
         self.assertFalse(any(event.startswith("build") for event in events))
         self.assertLess(events.index("pull web caddy"), events.index("stop web"))
+        self.assertLess(events.index("stop --timeout 60 web"), events.index("pull web caddy"))
+        self.assertFalse((checkout / ".config/maintenance/updating").exists())
         self.assertEqual((checkout / ".config/server-release").read_text().strip(), str(checkout / ".releases/candidate"))
         self.assertFalse((checkout / ".git").exists())
         self.assertFalse((checkout / "AGENTS.md").exists())
@@ -641,6 +646,7 @@ archive_legacy_checkout "$backup_dir"
                 self.assertEqual((checkout / ".config/server-release").exists(), failure in ("migration", "health", "https"))
                 self.assertTrue((checkout / ".git").exists())
                 self.assertTrue((checkout / "AGENTS.md").exists())
+                self.assertTrue((checkout / ".config/maintenance/updating").exists())
                 if failure in ("pull", "runtime"):
                     self.assertNotIn("stop web", events)
 
@@ -649,6 +655,7 @@ archive_legacy_checkout "$backup_dir"
         def index(prefix):
             return next(i for i, event in enumerate(events) if event.startswith(prefix))
         self.assertLess(index("build"), index("stop web"))
+        self.assertLess(index("stop --timeout 60 web"), index("build"))
         runtime = index("run --rm --no-deps -T --pull never --workdir")
         self.assertLess(index("build"), runtime)
         self.assertLess(runtime, index("up -d --wait --wait-timeout 120 db redis"))
@@ -683,7 +690,8 @@ archive_legacy_checkout "$backup_dir"
                 self.assertNotIn("install-cli", events)
                 if failure in ("build", "runtime", "proxy-config"):
                     self.assertNotIn("stop web", events)
-                    self.assertFalse(any(event.startswith("up ") for event in events))
+                    self.assertIn("stop --timeout 60 web", events)
+                    self.assertFalse(any(event.startswith("up ") and not event.endswith("caddy") for event in events))
                     self.assertFalse(list((self.root / "checkout.backups").iterdir()))
                 if failure in ("build", "proxy-config", "backup"):
                     self.assertFalse(any(event.startswith("run --rm --no-deps web") for event in events))
@@ -691,6 +699,60 @@ archive_legacy_checkout "$backup_dir"
                     self.assertFalse(any("--force-recreate" in event for event in events))
                 if failure == "health":
                     self.assertEqual(events[-1], "stop web")
+
+    def test_final_https_failure_reinstates_maintenance_and_stops_application(self):
+        checkout, events, _ = self.deployment("final-https", release=True)
+        self.assertTrue((checkout / ".config/maintenance/updating").exists())
+        self.assertIn("install-cli", events)
+        self.assertEqual(events[-1], "stop web")
+
+    def test_start_does_not_bypass_an_interrupted_update(self):
+        checkout = self.configuration()
+        (checkout / ".config/maintenance").mkdir()
+        (checkout / ".config/maintenance/updating").touch()
+        result = self.shell('''
+compose() { touch "$TEST_ROOT/should-not-run"; }
+start_site
+''', success=False)
+        self.assertIn("上次更新尚未完成", result.stderr)
+        self.assertFalse((self.root / "should-not-run").exists())
+
+    def test_update_disables_only_the_old_container_restart_policy(self):
+        checkout = self.configuration()
+        saved = (checkout / ".config/compose.autostart.yml").read_bytes()
+        self.shell('''
+compose() {
+  printf '%s\\n' "$*" >> "$TEST_ROOT/events"
+  if [[ $* == 'ps --all --quiet web' ]]; then printf 'old-web\\n'; fi
+}
+docker() { printf 'docker %s\\n' "$*" >> "$TEST_ROOT/events"; }
+begin_update_maintenance
+''')
+        events = (self.root / "events").read_text().splitlines()
+        self.assertLess(events.index("docker update --restart=no old-web"), events.index("stop --timeout 60 web"))
+        self.assertEqual((checkout / ".config/compose.autostart.yml").read_bytes(), saved)
+
+    @unittest.skipUnless(os.geteuid() == 0, "CLI entry point requires root")
+    def test_update_enters_maintenance_before_credentials_and_release_download(self):
+        checkout = self.configuration()
+        for failure in ("auth", "download"):
+            self.env["FAILURE"] = failure
+            (self.root / "events").unlink(missing_ok=True)
+            self.shell('''
+detect_ubuntu() { :; }
+flock() { :; }
+docker() { :; }
+compose() { printf '%s\\n' "$*" >> "$TEST_ROOT/events"; }
+prepare_auth() { echo auth >> "$TEST_ROOT/events"; [[ $FAILURE != auth ]]; }
+prepare_cloudflare() { :; }
+prepare_release() { echo download >> "$TEST_ROOT/events"; return 42; }
+main update --dir "$TEST_ROOT/checkout"
+''', success=False)
+            events = (self.root / "events").read_text().splitlines()
+            self.assertLess(events.index("stop --timeout 60 web"), events.index("auth"))
+            if failure == "download":
+                self.assertLess(events.index("auth"), events.index("download"))
+            self.assertTrue((checkout / ".config/maintenance/updating").exists())
 
     def test_invalid_maintenance_upgrade_restores_existing_proxy(self):
         checkout, events, _ = self.deployment("proxy-config", legacy=True)

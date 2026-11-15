@@ -146,13 +146,13 @@ sudo camp autostart             # 查看 Docker 和各服务的开机自启状�
 
 ### 更新应用与素材
 
-`update` 下载已发布的精简部署包，按 `RELEASE.json` 固定的 SHA-256 镜像摘要拉取并验证应用与 Caddy，单独同步素材库 `master`，然后停止应用，备份数据库、执行迁移并重新创建应用容器。素材清单中的新增表情会在应用启动时自动注册。数据库、上传文件、配置和证书持续保存在原有目录 / Docker 卷中。
+`update` 获取独占锁后立即停止旧应用并进入维护状态，再读取凭据、下载精简部署包、拉取和验证固定摘要镜像、同步素材、备份数据库及执行迁移。新应用启动自检期间仍不开放页面、API 或实时连接；CLI 更新、旧源码归档和 HTTPS 检查完成后才解除维护状态。素材清单中的新增表情会在应用启动时自动注册。数据库、上传文件、配置和证书持续保存在原有目录 / Docker 卷中。
 
-Node 大版本随新镜像一起升级，构建与运行阶段使用 Dockerfile 中的同一版本，pnpm 按根目录 `package.json` 的 `packageManager` 安装。依赖在镜像内重新安装，宿主机的 Node、pnpm 和旧容器的 `node_modules` 不参与新容器运行。CLI 在停站前核对新镜像中的 Node / pnpm 版本，并实际加载图像处理、正则匹配和其他核心原生依赖；版本或原生模块加载失败时终止更新，现有应用继续运行。
+Node 大版本随新镜像一起升级，构建与运行阶段使用 Dockerfile 中的同一版本，pnpm 按根目录 `package.json` 的 `packageManager` 安装。依赖在镜像内重新安装，宿主机的 Node、pnpm 和旧容器的 `node_modules` 不参与新容器运行。CLI 在维护期间核对新镜像中的 Node / pnpm 版本，并实际加载图像处理、正则匹配和其他核心原生依赖；版本或原生模块加载失败时终止更新并保持维护状态。
 
-素材工作副本有未提交修改、未发布提交、分叉或处于其他分支时，CLI 会停止并保留现场。主代码仓库不再 clone 或 pull；已有部署目录中的旧源码原样保留且不参与运行，清理需由维护者另行安排。更新使用已有配置；旧版 CLI 生成的 Web `command: [pnpm, start]` 覆盖会在备份后移除，恢复镜像默认启动入口。其他自定义设置保留，`compose.vps.yml` 的其他变化由维护者审查后应用到服务器 `compose.yml`。
+素材工作副本有未提交修改、未发布提交、分叉或处于其他分支时，CLI 会停止并保留现场。主代码仓库不再 clone 或 pull；旧源码在新版本健康检查通过后归档到本次备份目录的 `legacy-source/`。更新使用已有配置；旧版 CLI 生成的 Web `command: [pnpm, start]` 覆盖会在备份后移除，恢复镜像默认启动入口。其他自定义设置保留，`compose.vps.yml` 的其他变化由维护者审查后应用到服务器 `compose.yml`。
 
-下载或新镜像运行时检查失败时现有应用继续运行。备份、迁移或应用健康检查失败时应用保持停止；修复报错后再次执行 `camp update`。首次部署在安装 `camp` 命令前失败时，可以使用 `bash /tmp/camp-deploy.sh update` 继续；尚未生成配置时重新执行 `install`。
+下载、凭据验证、备份、迁移或健康检查失败时都保持维护状态，不自动重新开放旧实例。维护标记保存于数据目录 `.config/maintenance/updating`，容器或机器重启后仍有效；旧应用容器在更新期间临时禁用自动重启，保存的自启配置保持不变，新容器按该配置恢复策略。`camp start` / `restart` 不会绕过未完成的更新。修复报错后再次执行 `camp update`，成功时由 CLI 清除标记。首次部署在安装 `camp` 命令前失败时，可以使用 `bash /tmp/camp-deploy.sh update` 继续；尚未生成配置时重新执行 `install`。
 
 首次签发证书时，CLI 显示一条等待提示并重试 HTTPS 检查；超时后显示最终连接错误。此时检查域名解析、80 / 443 端口及 `camp logs` 中的 Caddy 日志，修复后运行 `camp start` 重新检查。首次安装尚无 `camp` 命令时，使用 `bash /tmp/camp-deploy.sh logs --dir <代码目录>` 查看日志。脚本不会自动还原数据库迁移。
 
@@ -290,7 +290,7 @@ CLI 专项可在 Linux / WSL 中单独运行 `bash scripts/check-deploy.sh`。�
 
 ## 更新与停机维护页
 
-首次部署或升级到本版后，Caddy 独立提供维护页。`camp update` 在停止应用前启动新版入口，备份、迁移和应用停机期间返回维护响应；`camp stop` 停止 web、db、redis，保留 Caddy。直接停止 web 容器、连接失败或上游返回 502/503/504 时也会切换；应用恢复后自动返回正常响应。关闭 Caddy、Docker 或 VPS 后，源站入口不可用，显示内容由 CDN 的故障页配置决定。
+首次部署或升级到本版后，Caddy 独立提供维护页。`camp update` 在下载前停止旧应用，维护页覆盖整个更新过程，包括新应用启动自检和部署收尾；仅在更新成功后恢复访问。`camp stop` 停止 web、db、redis，保留 Caddy。直接停止 web 容器、连接失败或上游返回 502/503/504 时也会切换；没有未完成更新标记时，应用恢复后自动返回正常响应。关闭 Caddy、Docker 或 VPS 后，源站入口不可用，显示内容由 CDN 的故障页配置决定。
 
 维护页沿用「营地·晴空」配色。私有素材库的 `public/maintenance/apology-v1.webp` 与 `apology-still-v1.webp` 通过 `compose.maintenance.yml` 只读挂载到 Caddy，仅开放 `/client-assets/camp/maintenance/` 路径。原稿和授权记录不挂载；缺图时页面保留图形占位和刷新按钮。素材需与代码配套发布。
 

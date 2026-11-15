@@ -3,3 +3,4 @@ services:
   caddy:
     volumes:
       - ${CAMP_ASSETS_DIR:-./private-assets/public}:/srv/camp-assets:ro
+      - ${CAMP_DATA_DIR:-.}/.config/maintenance:/srv/camp-state:ro

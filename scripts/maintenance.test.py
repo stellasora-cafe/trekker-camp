@@ -31,13 +31,15 @@ class MaintenanceTests(unittest.TestCase):
             (root / "proxy").write_text(":8080 {\n import /etc/caddy/camp-site.caddy\n}\n")
             (root / "origin").write_text(":3000 {\n respond /broken502 502\n respond /broken503 503\n respond /broken504 504\n respond /missing 404\n respond \"app fixture\" 200\n}\n")
             (root / "maintenance").mkdir()
+            (root / "state").mkdir()
             (root / "maintenance/image.webp").write_bytes(b"fixture-art")
             self.docker("network", "create", name)
             try:
                 self.docker("run", "-d", "--name", name + "-web", "--network", name, "--network-alias", "web",
                             "-v", f"{root / 'origin'}:/etc/caddy/Caddyfile:ro", image)
                 self.docker("run", "-d", "--name", name, "--network", name, "-p", "127.0.0.1::8080",
-                            "-v", f"{root / 'proxy'}:/etc/caddy/Caddyfile:ro", "-v", f"{root}:/srv/camp-assets:ro", image)
+                            "-v", f"{root / 'proxy'}:/etc/caddy/Caddyfile:ro", "-v", f"{root}:/srv/camp-assets:ro",
+                            "-v", f"{root / 'state'}:/srv/camp-state:ro", image)
                 address = "http://" + self.docker("port", name, "8080/tcp")
 
                 def request(path="/", accept="text/html", method="GET", expected=200):
@@ -88,6 +90,19 @@ class MaintenanceTests(unittest.TestCase):
                 self.assertEqual(body, b"app fixture")
                 self.assertEqual(response.headers["X-Camp-Page"], "app")
                 self.assertIsNone(response.headers.get("Retry-After"))
+                # A healthy or restarted application stays hidden until deployment completes.
+                (root / "state/updating").touch()
+                for path, method in (("/", "GET"), ("/api/meta", "POST"), ("/healthz", "GET"), ("/streaming", "GET"), ("/client/meta", "POST")):
+                    response, body = request(path, method=method, expected=302 if path == "/" else 503)
+                    self.assertEqual(response.headers["X-Camp-Page"], "maintenance")
+                    self.assertIn("no-store", response.headers["Cache-Control"])
+                self.assertEqual(request("/client-assets/camp/maintenance/image.webp")[1], b"fixture-art")
+                request("/__camp-maintenance/v1.html")
+                self.docker("restart", name)
+                address = "http://" + self.docker("port", name, "8080/tcp")
+                request(expected=302)
+                (root / "state/updating").unlink()
+                self.assertEqual(request()[1], b"app fixture")
             finally:
                 subprocess.run(["docker", "rm", "-f", name, name + "-web"], capture_output=True)
                 self.docker("network", "rm", name)
