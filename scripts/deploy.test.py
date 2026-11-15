@@ -1766,6 +1766,26 @@ main
                 self.assertEqual((previous / "VERSION").read_text(), self.env["CLI_REVISION"] + "\n")
 
     @unittest.skipUnless(os.geteuid() == 0, "CLI entry point requires root")
+    def test_self_update_resolves_saved_credentials_in_custom_data_directory(self):
+        checkout = self.root / "checkout"
+        data = self.root / "data"
+        (checkout / ".config").mkdir(parents=True)
+        (data / ".config").mkdir(parents=True)
+        (checkout / ".config/data-dir").write_text(str(data))
+        (data / ".config/github-token").write_text(GITHUB_TEST_PAT)
+        self.shell('''
+unset config_dir data_dir
+detect_ubuntu() { :; }
+flock() { :; }
+self_update() {
+  [[ $config_dir == "$TEST_ROOT/data/.config" ]]
+  [[ $(< "$config_dir/github-token") == "$TEST_GITHUB_PAT" ]]
+}
+docker() { fail 'Docker must not be contacted'; }
+main self-update --dir "$TEST_ROOT/checkout"
+''')
+
+    @unittest.skipUnless(os.geteuid() == 0, "CLI entry point requires root")
     def test_self_update_dispatch_needs_no_application_or_credentials(self):
         result = self.shell('''
 detect_ubuntu() { :; }

@@ -1010,6 +1010,8 @@ main() {
 	detect_ubuntu /etc/os-release
 	if [[ $action == self-update ]]; then
 		[[ -z $site_url && -z $requested_data_dir ]] || fail 'self-update 不接受 --url 或 --data-dir。'
+		camp_dir=$(realpath -m -- "$camp_dir")
+		resolve_storage
 		exec 9>/run/lock/trekker-camp-deploy.lock
 		flock -n 9 || fail '另一项营地部署或备份正在运行。'
 		self_update /usr/local
