@@ -540,6 +540,8 @@ http://:8081 {
         self.env["TEST_RELEASE_DIR"] = ""
         if release:
             import json
+            (checkout / ".git").mkdir()
+            (checkout / "AGENTS.md").write_text("legacy source instructions")
             candidate = checkout / ".releases/candidate"
             candidate.mkdir(parents=True)
             shutil.copy(ROOT / "compose.assets.yml", candidate)
@@ -550,6 +552,7 @@ camp_dir="$TEST_ROOT/checkout"
 backup_dir=''
 compose() {
   printf '%s\n' "$*" >> "$TEST_ROOT/events"
+  if [[ $* == 'config --no-env-resolution --format json' ]]; then printf '{"services":{}}'; return; fi
   case "$1:$FAILURE" in build:build|pull:pull|exec:backup) return 42 ;; esac
   if [[ $* == *'web node --input-type=module' ]]; then
     cat > "$TEST_ROOT/runtime-check.mjs"
@@ -581,17 +584,64 @@ deploy "$TEST_ACTION"
         self.assertFalse(any(event.startswith("build") for event in events))
         self.assertLess(events.index("pull web caddy"), events.index("stop web"))
         self.assertEqual((checkout / ".config/server-release").read_text().strip(), str(checkout / ".releases/candidate"))
+        self.assertFalse((checkout / ".git").exists())
+        self.assertFalse((checkout / "AGENTS.md").exists())
+        archived = next((self.root / "checkout.backups").glob("*/legacy-source/AGENTS.md"))
+        self.assertEqual(archived.read_text(), "legacy source instructions")
+        self.assertLess(events.index("install-cli"), events.index("config --no-env-resolution --format json"))
+
+    def test_legacy_checkout_archive_preserves_data_and_custom_mounts(self):
+        checkout = self.repository("checkout", {"AGENTS.md": "instructions", "apps/server.js": "source"})
+        for name in (".config/default.yml", ".releases/current/RELEASE.json", "compose.yml",
+                     "db/data", "redis/data", "files/upload", "private-assets/public/art",
+                     "caddy/cert", "backups/previous", "restic-cache/data", "custom-mounted/data",
+                     ".env", "runtime-env/custom.env", "node_modules/dependency.js", "operator-notes.txt"):
+            path = checkout / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(name)
+        (self.root / "backup").mkdir()
+        self.shell('''
+release_source="$camp_dir/.releases/current"
+backup_dir="$TEST_ROOT/backup"
+compose() { printf '{"services":{"web":{"env_file":[{"path":"%s/runtime-env/custom.env"}],"volumes":[{"type":"bind","source":"%s/custom-mounted"}]}}}' "$camp_dir" "$camp_dir"; }
+archive_legacy_checkout "$backup_dir"
+archive_legacy_checkout "$backup_dir"
+''')
+        archive = self.root / "backup/legacy-source"
+        for name in (".git", "AGENTS.md", "apps/server.js", "node_modules/dependency.js", "operator-notes.txt"):
+            self.assertTrue((archive / name).exists(), name)
+            self.assertFalse((checkout / name).exists(), name)
+        self.assertEqual(self.git(archive, "show", "HEAD:AGENTS.md"), "instructions")
+        for name in (".config/default.yml", ".releases/current/RELEASE.json", "compose.yml",
+                     "db/data", "redis/data", "files/upload", "private-assets/public/art",
+                     "caddy/cert", "backups/previous", "restic-cache/data", "custom-mounted/data", ".env", "runtime-env/custom.env"):
+            self.assertEqual((checkout / name).read_text(), name)
+
+    def test_legacy_checkout_archive_refuses_whole_checkout_bind(self):
+        checkout = self.repository("checkout", {"AGENTS.md": "instructions"})
+        (self.root / "backup").mkdir()
+        self.shell('''
+release_source="$camp_dir/.releases/current"
+backup_dir="$TEST_ROOT/backup"
+compose() { printf '{"services":{"web":{"volumes":[{"type":"bind","source":"%s"}]}}}' "$camp_dir"; }
+archive_legacy_checkout "$backup_dir"
+''', success=False)
+        self.assertTrue((checkout / ".git").is_dir())
+        self.assertTrue((checkout / "AGENTS.md").is_file())
+        self.assertFalse((self.root / "backup/legacy-source").exists())
 
     def test_release_preflight_preserves_old_selection_and_migration_keeps_new_selection(self):
-        for failure in ("pull", "runtime", "migration"):
+        for failure in ("pull", "runtime", "migration", "health", "https"):
             with self.subTest(failure=failure):
                 for path in (self.root / "checkout", self.root / "checkout.backups"):
                     if path.exists():
                         shutil.rmtree(path)
                 (self.root / "events").unlink(missing_ok=True)
                 checkout, events, _ = self.deployment(failure, release=True)
-                self.assertEqual((checkout / ".config/server-release").exists(), failure == "migration")
-                if failure != "migration":
+                self.assertEqual((checkout / ".config/server-release").exists(), failure in ("migration", "health", "https"))
+                self.assertTrue((checkout / ".git").exists())
+                self.assertTrue((checkout / "AGENTS.md").exists())
+                if failure in ("pull", "runtime"):
                     self.assertNotIn("stop web", events)
 
     def test_deployment_orders_build_backup_migration_and_health_checks(self):

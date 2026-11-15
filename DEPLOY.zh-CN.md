@@ -43,7 +43,7 @@ sudo camp update --release "$release"
 sudo camp status
 ```
 
-若旧 CLI 尚未保存部署目录，在 `camp update` 后追加 `--dir <现有部署目录>`。CLI 保留数据目录、应用配置、已保存的 PAT、备份和自启设置；旧主仓库源码保持原样，后续运行使用 Release 镜像。私有素材通过新组织地址验证并快进同步后，才将原有 HTTPS/SSH `origin` 迁到 `https://github.com/stellasora-cafe/trekker-camp-assets.git`；访问失败时保留原工作副本和远程地址。已保存 PAT 继续复用；若组织转移后权限已失效，需要提供对新组织素材仓有效的只读 PAT，成功读取后才替换已保存凭据。
+若旧 CLI 尚未保存部署目录，在 `camp update` 后追加 `--dir <现有部署目录>`。CLI 保留数据目录、应用配置、已保存的 PAT、备份和自启设置。新版本迁移、应用及 HTTPS 健康检查全部通过后，旧主仓库源码、`.git`、开发依赖和代理文档移到本次更新备份目录的 `legacy-source/`，可供恢复；运行目录只保留 Compose、配置、Release 和持久化目录。自定义容器绑定挂载继续保留原路径；如挂载了整个旧源码目录，CLI 会保留源码并提示先调整挂载。私有素材通过新组织地址验证并快进同步后，才将原有 HTTPS/SSH `origin` 迁到 `https://github.com/stellasora-cafe/trekker-camp-assets.git`；访问失败时保留原工作副本和远程地址。已保存 PAT 继续复用；若组织转移后权限已失效，需要提供对新组织素材仓有效的只读 PAT，成功读取后才替换已保存凭据。
 
 将示例域名替换为本站域名。CLI 会隐藏输入 GitHub 细粒度 PAT 和 Cloudflare token，也会读取已有的 `GH_TOKEN`、`GITHUB_TOKEN`、`CLOUDFLARE_API_TOKEN`。私有素材访问成功后，GitHub PAT 自动保存到数据目录的 `.config/github-token`，权限为 root `0600`；后续自动读取，无需安装或登录 `gh`。首次安装后通过 `camp` 命令操作。
 

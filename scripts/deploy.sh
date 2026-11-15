@@ -756,6 +756,43 @@ prepare_cdn() (
 
 )
 
+archive_legacy_checkout() {
+	[[ -n ${release_source:-} && -d $camp_dir/.git ]] || return 0
+	local destination=$1 mounts
+	mounts=$(mktemp "$destination/compose-mounts-XXXXXX.json")
+	compose config --no-env-resolution --format json > "$mounts"
+	python3 - "$camp_dir" "$destination" "$mounts" <<'PY'
+import json, pathlib, shutil, sys
+root = pathlib.Path(sys.argv[1]).resolve()
+backup = pathlib.Path(sys.argv[2]).resolve()
+keep = {'.config', '.releases', '.env', 'compose.yml', 'db', 'redis', 'files', 'private-assets', 'caddy', 'backups', 'restic-cache'}
+# Custom bind mounts must keep their original paths when the containers restart.
+config = json.load(open(sys.argv[3]))
+for service in config.get('services', {}).values():
+    for env in service.get('env_file', []):
+        path = pathlib.Path(env['path'] if isinstance(env, dict) else env).resolve()
+        if path.is_relative_to(root):
+            keep.add(path.relative_to(root).parts[0])
+    for volume in service.get('volumes', []):
+        if volume.get('type') != 'bind':
+            continue
+        path = pathlib.Path(volume['source']).resolve()
+        if path == root:
+            sys.exit('存在挂载整个旧源码目录的自定义容器配置，请先调整挂载；旧源码已保留。')
+        if path.is_relative_to(root):
+            keep.add(path.relative_to(root).parts[0])
+if backup.is_relative_to(root):
+    keep.add(backup.relative_to(root).parts[0])
+archive = backup / 'legacy-source'
+archive.mkdir(mode=0o700)
+for entry in sorted(root.iterdir()):
+    if entry.name not in keep:
+        shutil.move(str(entry), str(archive / entry.name))
+print(f'旧源码及开发文件已归档：{archive}；配置、持久化数据和自定义挂载保持原路径。')
+PY
+	rm -f -- "$mounts"
+}
+
 deploy() {
 	local action=$1 maintenance_upgrade=0
 	stage='配置 CDN 访客 IP 识别'
@@ -819,6 +856,8 @@ deploy() {
 	else
 		install_cli "$camp_dir/scripts" "$(git -C "$camp_dir" rev-parse HEAD)" /usr/local "$camp_dir"
 	fi
+	stage='归档旧源码工作副本'
+	archive_legacy_checkout "$backup_dir"
 	log "部署完成：$site_url。数据目录：$data_dir。使用 camp status 查看状态，camp logs 查看日志。"
 	compose ps
 	show_setup_status
