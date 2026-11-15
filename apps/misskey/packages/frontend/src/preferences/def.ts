@@ -204,9 +204,6 @@ export const PREF_DEF = definePreferences({
 	statusbars: {
 		default: [] as StatusbarStore[],
 	},
-	serverDisconnectedBehavior: {
-		default: 'quiet' as 'quiet' | 'reload' | 'dialog',
-	},
 	nsfw: {
 		default: 'respect' as 'respect' | 'force' | 'ignore',
 	},
@@ -290,12 +287,6 @@ export const PREF_DEF = definePreferences({
 	},
 	numberOfPageCache: {
 		default: 3,
-	},
-	pollingInterval: {
-		// 1 ... 低
-		// 2 ... 中
-		// 3 ... 高
-		default: 2,
 	},
 	showNoteActionsOnlyHover: {
 		default: false,

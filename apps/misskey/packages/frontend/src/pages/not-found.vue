@@ -4,9 +4,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<div style="align-content: center; height: 100cqh;">
-	<MkResult type="notFound" :text="i18n.ts.notFoundDescription"/>
-</div>
+<PageWithHeader :actions="headerActions" :tabs="headerTabs">
+	<div :class="$style.content">
+		<MkResult type="notFound" :text="i18n.ts.notFoundDescription"/>
+	</div>
+</PageWithHeader>
 </template>
 
 <script lang="ts" setup>
@@ -32,3 +34,10 @@ definePage(() => ({
 	icon: 'ti ti-alert-triangle',
 }));
 </script>
+
+<style lang="scss" module>
+.content {
+	min-height: inherit;
+	align-content: center;
+}
+</style>

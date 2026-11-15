@@ -59,7 +59,7 @@ describe('Federation HTTP endpoints are disabled', () => {
 	])('rejects the federation API %s', async endpoint => {
 		const response = await relativeFetch(`api/${endpoint}`, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			headers: { 'Content-Type': 'application/json', 'X-Camp-Client': 'web-v1' },
 			body: JSON.stringify({ i: alice.token, uri: 'https://remote.example/users/remote', host: 'remote.example', inbox: 'https://remote.example/inbox' }),
 		});
 		expect(response.status).toBe(403);

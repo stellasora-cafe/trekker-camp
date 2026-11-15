@@ -32,6 +32,7 @@ import type { EventEmitter } from 'events';
 
 //#region Stream type-body definitions
 export interface BroadcastTypes {
+	clientResourcesUpdated: { revision: string; paths: string[] };
 	emojiAdded: {
 		emoji: Packed<'EmojiDetailed'>;
 	};
@@ -230,6 +231,7 @@ type UndefinedAsNullAll<T> = {
 };
 
 export interface InternalEventTypes {
+	clientSessionRevoked: { userId: MiUser['id']; sessionId?: string; };
 	userChangeSuspendedState: { id: MiUser['id']; isSuspended: MiUser['isSuspended']; };
 	userChangeDeletedState: { id: MiUser['id']; isDeleted: MiUser['isDeleted']; };
 	userTokenRegenerated: { id: MiUser['id']; oldToken: string; newToken: string; };

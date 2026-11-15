@@ -39,7 +39,7 @@ import { i18n } from '@/i18n.js';
 import { provideMetadataReceiver, provideReactiveMetadata } from '@/page.js';
 import { openingWindowsCount } from '@/os.js';
 import { claimAchievement } from '@/utility/achievements.js';
-import { createRouter, mainRouter } from '@/router.js';
+import { createRouter, mainRouter, goBack, routerCanGoBack } from '@/router.js';
 import { analytics } from '@/analytics.js';
 import { DI } from '@/di.js';
 import { prefer } from '@/preferences.js';
@@ -56,11 +56,8 @@ const windowRouter = createRouter(props.initialPath);
 
 const pageMetadata = ref<null | PageMetadata>(null);
 const windowEl = useTemplateRef('windowEl');
-const _history_ = ref<{ path: string; }[]>([{
-	path: windowRouter.getCurrentFullPath(),
-}]);
 const buttonsLeft = computed(() => {
-	return _history_.value.length > 1 ? [{
+	return routerCanGoBack(windowRouter) ? [{
 		icon: 'ti ti-arrow-left',
 		title: i18n.ts.goBack,
 		onClick: back,
@@ -88,15 +85,6 @@ function getSearchMarker(path: string) {
 }
 
 const searchMarkerId = ref<string | null>(getSearchMarker(props.initialPath));
-
-windowRouter.addListener('push', ctx => {
-	_history_.value.push({ path: ctx.fullPath });
-});
-
-windowRouter.addListener('replace', ctx => {
-	_history_.value.pop();
-	_history_.value.push({ path: ctx.fullPath });
-});
 
 windowRouter.addListener('forcePush', ctx => {
 	window.open(url + ctx.fullPath, '_blank', 'noopener');
@@ -128,6 +116,7 @@ windowRouter.addListener('change', ctx => {
 windowRouter.init(true);
 
 provide(DI.router, windowRouter);
+provide('pageHeaderBackRouter', windowRouter);
 provide(DI.inAppSearchMarkerId, searchMarkerId);
 provideMetadataReceiver((metadataGetter) => {
 	const info = metadataGetter();
@@ -161,8 +150,7 @@ const contextmenu = computed(() => ([{
 }]));
 
 function back() {
-	_history_.value.pop();
-	windowRouter.replaceByPath(_history_.value.at(-1)!.path);
+	goBack(windowRouter);
 }
 
 function reload() {

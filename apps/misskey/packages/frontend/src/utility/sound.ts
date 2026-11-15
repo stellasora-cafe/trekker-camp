@@ -10,6 +10,18 @@ import { getInitialPrefValue } from '@/preferences/manager.js';
 
 let ctx: AudioContext;
 const cache = new Map<string, AudioBuffer>();
+
+export function invalidateSoundCache(paths: readonly string[]): string[] {
+	const urls: string[] = [];
+	for (const key of cache.keys()) {
+		const url = new URL(key, window.location.origin);
+		if (url.origin !== window.location.origin || !/^\/(?:client-assets|static-assets)\//.test(url.pathname)) continue;
+		if (paths.length > 0 && !paths.includes(url.pathname)) continue;
+		cache.delete(key);
+		urls.push(url.href);
+	}
+	return urls;
+}
 let canPlay = true;
 
 export const soundsTypes = [

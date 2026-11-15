@@ -209,7 +209,9 @@ export class ApiCallService implements OnApplicationShutdown {
 			return Promise.resolve();
 		}
 
-		return this.telemetryService.startSpan('API: ' + endpoint.name, () => this.authenticateService.authenticate(token).then(([user, app]) => {
+		return this.telemetryService.startSpan('API: ' + endpoint.name, () => this.authenticateService.authenticate(token, request.headers['x-camp-client'] as string | undefined, request.url.startsWith('/api/client/')).then(([user, app, sessionId]) => {
+			delete request.headers['x-camp-session-id'];
+			if (sessionId) request.headers['x-camp-session-id'] = sessionId;
 			const call = this.call(endpoint, user, app, body, null, request).then((res) => {
 				if (request.method === 'GET' && endpoint.meta.cacheSec && !token && !user) {
 					reply.header('Cache-Control', `public, max-age=${endpoint.meta.cacheSec}`);
@@ -279,7 +281,9 @@ export class ApiCallService implements OnApplicationShutdown {
 				return;
 			}
 
-			return await this.telemetryService.startSpan('API: ' + endpoint.name, () => this.authenticateService.authenticate(token).then(([user, app]) => {
+			return await this.telemetryService.startSpan('API: ' + endpoint.name, () => this.authenticateService.authenticate(token, request.headers['x-camp-client'] as string | undefined, request.url.startsWith('/api/client/')).then(([user, app, sessionId]) => {
+				delete request.headers['x-camp-session-id'];
+				if (sessionId) request.headers['x-camp-session-id'] = sessionId;
 				const call = this.call(endpoint, user, app, fields, {
 					name: multipartData.filename,
 					path: path,

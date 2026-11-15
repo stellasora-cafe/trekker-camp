@@ -21,6 +21,11 @@ handle /client-assets/camp/maintenance/* {
 
 handle {
 	route {
+		@updating file {
+			root /srv/camp-state
+			try_files updating
+		}
+		error @updating 503
 		vars camp_client_ip {client_ip}
 		@edgeone expression `{env.CAMP_EDGEONE_ORIGIN_SECRET} != "" && {http.request.header.X-Camp-Origin-Secret} == {env.CAMP_EDGEONE_ORIGIN_SECRET} && {http.request.header.EO-Connecting-IP} != ""`
 		vars @edgeone camp_client_ip {http.request.header.EO-Connecting-IP}

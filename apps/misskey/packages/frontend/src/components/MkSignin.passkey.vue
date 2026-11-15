@@ -13,16 +13,17 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<div :class="$style.passkeyDescription">{{ i18n.ts.useSecurityKey }}</div>
 		</div>
 
-		<MkButton large primary rounded :disabled="queryingKey" style="margin: 0 auto;" @click="queryKey">{{ i18n.ts.retry }}</MkButton>
+		<div v-if="failed" role="status" :class="$style.passkeyDescription">{{ i18n.ts.passkeyVerificationFailed }}</div>
+		<MkButton large primary rounded :disabled="queryingKey" style="margin: 0 auto;" @click="retry">{{ i18n.ts.retry }}</MkButton>
 
-		<MkButton v-if="isPerformingPasswordlessLogin !== true" transparent rounded :disabled="queryingKey" style="margin: 0 auto;" @click="emit('useTotp')">{{ i18n.ts.useTotp }}</MkButton>
+		<MkButton v-if="isPerformingPasswordlessLogin !== true" transparent rounded style="margin: 0 auto;" @click="useTotp">{{ i18n.ts.useTotp }}</MkButton>
 	</div>
 </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { startAuthentication } from '@simplewebauthn/browser';
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
+import { startAuthentication, WebAuthnAbortService } from '@simplewebauthn/browser';
 
 import { i18n } from '@/i18n.js';
 
@@ -38,26 +39,50 @@ const props = defineProps<{
 const emit = defineEmits<{
 	(ev: 'done', credential: AuthenticationResponseJSON): void;
 	(ev: 'useTotp'): void;
+	(ev: 'retry'): void;
 }>();
 
 const queryingKey = ref(true);
+const failed = ref(false);
+let active = true;
+
+function retry(): void {
+	if (queryingKey.value) return;
+	emit('retry');
+}
+
+function useTotp(): void {
+	active = false;
+	if (queryingKey.value) WebAuthnAbortService.cancelCeremony();
+	queryingKey.value = false;
+	emit('useTotp');
+}
 
 async function queryKey() {
 	queryingKey.value = true;
-	await startAuthentication({ optionsJSON: props.credentialRequest })
-		.catch(() => {
-			return Promise.reject(null);
-		})
-		.then((credential) => {
-			emit('done', credential);
-		})
-		.finally(() => {
-			queryingKey.value = false;
-		});
+	failed.value = false;
+	try {
+		const credential = await startAuthentication({ optionsJSON: props.credentialRequest });
+		if (active) emit('done', credential);
+	} catch (err) {
+		const name = err instanceof Error ? err.name : undefined;
+		failed.value = active && name !== 'AbortError' && name !== 'NotAllowedError';
+	} finally {
+		queryingKey.value = false;
+	}
 }
 
 onMounted(() => {
-	queryKey();
+	void queryKey();
+});
+
+watch(() => props.credentialRequest, () => {
+	if (active) void queryKey();
+});
+
+onBeforeUnmount(() => {
+	active = false;
+	if (queryingKey.value) WebAuthnAbortService.cancelCeremony();
 });
 </script>
 

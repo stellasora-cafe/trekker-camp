@@ -12,7 +12,7 @@ import type { SwMessage, SwMessageOrderType } from '@/types.js';
 import { getAccountFromId } from '@/scripts/get-account-from-id.js';
 import { getUrlWithLoginId } from '@/scripts/login-id.js';
 
-export const cli = new Misskey.api.APIClient({ origin, fetch: (...args): Promise<Response> => fetch(...args) });
+export const cli = new Misskey.api.APIClient({ origin, client: 'web-v1', fetch: (...args): Promise<Response> => fetch(...args) });
 
 export async function api<
 	E extends keyof Misskey.Endpoints,

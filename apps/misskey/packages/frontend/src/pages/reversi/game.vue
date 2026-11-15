@@ -4,9 +4,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<div v-if="game == null || (!game.isEnded && connection == null)"><MkLoading/></div>
-<GameSetting v-else-if="!game.isStarted" v-model:shareWhenStart="shareWhenStart" :game="game" :connection="connection!"/>
-<GameBoard v-else :game="game" :connection="connection"/>
+<PageWithHeader>
+	<div v-if="game == null || (!game.isEnded && connection == null)"><MkLoading/></div>
+	<GameSetting v-else-if="!game.isStarted" v-model:shareWhenStart="shareWhenStart" :game="game" :connection="connection!"/>
+	<GameBoard v-else :game="game" :connection="connection"/>
+</PageWithHeader>
 </template>
 
 <script lang="ts" setup>

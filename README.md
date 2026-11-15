@@ -1,5 +1,7 @@
 # 旅人营地（trekker-camp）
 
+代码仓库：[stellasora-cafe/trekker-camp](https://github.com/stellasora-cafe/trekker-camp)。
+
 面向星塔旅人（Stella Sora）简中玩家的第三方社区，基于 [Misskey](https://github.com/misskey-dev/misskey) 定制，由项目团队维护。默认开发分支为 `master`。
 
 ## 项目定位与支持范围

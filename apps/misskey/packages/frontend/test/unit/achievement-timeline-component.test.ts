@@ -18,6 +18,8 @@ const { listeners, misskeyApi, claimAchievement } = vi.hoisted(() => ({
 
 vi.mock('@/stream.js', () => ({
 	useStream: () => ({
+		on: vi.fn(),
+		off: vi.fn(),
 		useChannel: (name: string) => ({
 			on: (_event: string, callback: (note: entities.Note) => void) => listeners.set(name, callback),
 			dispose: () => listeners.delete(name),

@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, vi } from 'vitest';
 import WS from 'vitest-websocket-mock';
 import Stream from '../src/streaming.js';
 
@@ -156,6 +156,45 @@ describe('Streaming', () => {
 
 		expect(mainChannelReceived.length).toEqual(0);
 
+		stream.close();
+		server.close();
+	});
+
+	test('reconnect restores subscriptions before recovering state', async () => {
+		const server = new WS('ws://localhost:61819/streaming');
+		const stream = new Stream('http://localhost:61819', { token: 'LOCAL_SESSION' }, { client: 'web-v1' });
+		stream.useChannel('main');
+		stream.useChannel('homeTimeline', { withRenotes: false });
+		const socket = await server.connected;
+		expect(new URL(socket.url).searchParams.get('client')).toBe('web-v1');
+		await server.nextMessage;
+		await server.nextMessage;
+		const recovery = vi.fn(() => stream.send('recovery-ready'));
+		stream.on('_reconnected_', recovery);
+		socket.close({ code: 1006, reason: 'local interruption', wasClean: false });
+		await vi.waitFor(() => expect(stream.state).toBe('reconnecting'));
+		stream.reconnect();
+		const main = JSON.parse(await server.nextMessage as string);
+		const home = JSON.parse(await server.nextMessage as string);
+		expect(main.body.channel).toBe('main');
+		expect(home.body.channel).toBe('homeTimeline');
+		expect(home.body.params).toEqual({ withRenotes: false });
+		expect(JSON.parse(await server.nextMessage as string).type).toBe('recovery-ready');
+		expect(recovery).toHaveBeenCalledOnce();
+		stream.close();
+		server.close();
+	});
+
+	test('revoked sessions stop reconnecting and emit authentication failure', async () => {
+		const server = new WS('ws://localhost:61820/streaming');
+		const stream = new Stream('http://localhost:61820', { token: 'LOCAL_SESSION' });
+		const failed = vi.fn();
+		stream.on('_authenticationFailed_', failed);
+		const socket = await server.connected;
+		socket.close({ code: 4001, reason: 'Client session revoked', wasClean: true });
+		await vi.waitFor(() => expect(failed).toHaveBeenCalledOnce());
+		await new Promise(resolve => setTimeout(resolve, 550));
+		expect(server.server.clients().length).toBe(0);
 		stream.close();
 		server.close();
 	});

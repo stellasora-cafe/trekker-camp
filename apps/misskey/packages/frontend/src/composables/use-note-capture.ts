@@ -11,9 +11,7 @@ import type { Reactive } from 'vue';
 import type { NoteUpdatedEvent } from 'misskey-js/streaming.types.js';
 import { useStream } from '@/stream.js';
 import { $i } from '@/i.js';
-import { store } from '@/store.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
-import { prefer } from '@/preferences.js';
 import { globalEvents } from '@/events.js';
 
 export const noteEvents = new EventEmitter<{
@@ -62,12 +60,7 @@ function pollingDequeue(note: Pick<Misskey.entities.Note, 'id' | 'createdAt'>) {
 }
 
 const CAPTURE_MAX = 30;
-const MIN_POLLING_INTERVAL = 1000 * 10;
-const POLLING_INTERVAL =
-	prefer.s.pollingInterval === 1 ? MIN_POLLING_INTERVAL * 1.5 * 1.5 :
-	prefer.s.pollingInterval === 2 ? MIN_POLLING_INTERVAL * 1.5 :
-	prefer.s.pollingInterval === 3 ? MIN_POLLING_INTERVAL :
-	MIN_POLLING_INTERVAL;
+const POLLING_INTERVAL = 15_000;
 
 // documentが非表示の間はポーリングを停止する
 createVisibilityAwareInterval(() => {
@@ -113,11 +106,16 @@ function pollingSubscribe(props: {
 	});
 }
 
+const reconnectNoteRequests = new Map<string, Promise<Misskey.entities.Note>>();
+
 function realtimeSubscribe(props: {
 	note: Pick<Misskey.entities.Note, 'id' | 'createdAt'>;
+	$note: ReactiveNoteData;
+	onRefreshed: () => void;
 }): void {
 	const note = props.note;
 	const connection = useStream();
+	let disposed = false;
 
 	function onStreamNoteUpdated(noteData: NoteUpdatedEvent): void {
 		const { type, id, body } = noteData;
@@ -171,12 +169,36 @@ function realtimeSubscribe(props: {
 		capture(false);
 	}
 
+	async function refreshNote() {
+		let request = reconnectNoteRequests.get(note.id);
+		if (!request) {
+			request = misskeyApi('notes/show', { noteId: note.id });
+			reconnectNoteRequests.set(note.id, request);
+			void request.finally(() => reconnectNoteRequests.delete(note.id)).catch(() => {});
+		}
+		try {
+			const updated = await request;
+			if (disposed) return;
+			props.$note.reactions = normalizeReactions(updated.reactions);
+			props.$note.reactionCount = updated.reactionCount;
+			props.$note.reactionEmojis = updated.reactionEmojis;
+			props.$note.myReaction = updated.myReaction;
+			props.$note.pollChoices = updated.poll?.choices ?? [];
+			props.onRefreshed();
+		} catch (error) {
+			if (!disposed && (error as { code?: string })?.code === 'NO_SUCH_NOTE') globalEvents.emit('noteDeleted', note.id);
+		}
+	}
+
 	capture(true);
 	connection.on('_connected_', onStreamConnected);
+	connection.on('_reconnected_', refreshNote);
 
 	onUnmounted(() => {
+		disposed = true;
 		decapture(true);
 		connection.off('_connected_', onStreamConnected);
+		connection.off('_reconnected_', refreshNote);
 	});
 }
 
@@ -187,6 +209,14 @@ export type ReactiveNoteData = {
 	myReaction: Misskey.entities.Note['myReaction'];
 	pollChoices: NonNullable<Misskey.entities.Note['poll']>['choices'];
 };
+
+function normalizeReactions(reactions: Misskey.entities.Note['reactions']) {
+	return Object.entries(reactions).reduce((normalized, [name, count]) => {
+		const key = name.replace(/^:(\w+):$/, ':$1@.:');
+		normalized[key] = (normalized[key] ?? 0) + count;
+		return normalized;
+	}, {} as Misskey.entities.Note['reactions']);
+}
 
 const noReaction = Symbol();
 
@@ -201,16 +231,7 @@ export function useNoteCapture(props: {
 	const { note, parentNote, mock } = props;
 
 	const $note = reactive<ReactiveNoteData>({
-		reactions: Object.entries(note.reactions).reduce((acc, [name, count]) => {
-			// Normalize reactions
-			const normalizedName = name.replace(/^:(\w+):$/, ':$1@.:');
-			if (acc[normalizedName] == null) {
-				acc[normalizedName] = count;
-			} else {
-				acc[normalizedName] += count;
-			}
-			return acc;
-		}, {} as Misskey.entities.Note['reactions']),
+		reactions: normalizeReactions(note.reactions),
 		reactionCount: note.reactionCount,
 		reactionEmojis: note.reactionEmojis,
 		myReaction: note.myReaction,
@@ -287,9 +308,14 @@ export function useNoteCapture(props: {
 			return;
 		}
 
-		if ($i && store.s.realtimeMode) {
+		if ($i) {
 			realtimeSubscribe({
 				note,
+				$note,
+				onRefreshed: () => {
+					reactionUserMap.clear();
+					pollVotedKeys.clear();
+				},
 			});
 		} else {
 			pollingSubscribe({

@@ -31,6 +31,7 @@ usage() {
 选项：
   --dir PATH   覆盖本次操作的代码目录；默认使用已记录目录，首次为 /opt/trekker-camp
   --data-dir PATH  首次安装的数据目录，默认与部署目录相同；后续自动读取
+  --release TAG  指定已发布的 server-v版本号；默认最新稳定服务端 Release
   --url URL    首次部署的 HTTPS 域名；Cloudflare DNS 指向 VPS，开放 TCP 80/443
   -h, --help   显示帮助
 
@@ -254,26 +255,89 @@ install_cli() {
 	fi
 }
 
+# A release contains deployment files only; application code runs from pinned images.
+download_release() (
+	local destination=$1 requested=${2:-} metadata archive tag
+	install -d -m 0755 "$destination"
+	metadata=$(mktemp)
+	archive=$(mktemp)
+	trap 'rm -f -- "$metadata" "$archive"' EXIT
+	if [[ -n $requested ]]; then
+		[[ $requested =~ ^server-v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]] || fail 'Release 标签必须为 server-v版本号。'
+		curl --fail --silent --show-error --location --proto '=https' "https://api.github.com/repos/stellasora-cafe/trekker-camp/releases/tags/$requested" -o "$metadata"
+	else
+		curl --fail --silent --show-error --location --proto '=https' 'https://api.github.com/repos/stellasora-cafe/trekker-camp/releases?per_page=100' -o "$metadata"
+	fi
+	tag=$(python3 - "$metadata" "$requested" <<'PY'
+import json, re, sys
+releases = json.load(open(sys.argv[1]))
+if isinstance(releases, dict): releases = [releases]
+for release in releases:
+    tag = release.get('tag_name', '')
+    if re.fullmatch(r'server-v[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?', tag) and not release.get('draft') and (sys.argv[2] or not release.get('prerelease')):
+        name = 'camp-server-' + tag + '.tar.gz'
+        if any(a.get('name') == name for a in release.get('assets', [])):
+            print(tag)
+            break
+else: sys.exit('没有可安装的已发布服务端 Release。')
+PY
+	)
+	curl --fail --silent --show-error --location --proto '=https' "https://github.com/stellasora-cafe/trekker-camp/releases/download/$tag/camp-server-$tag.tar.gz" -o "$archive"
+	python3 - "$archive" "$destination" "$tag" <<'PY'
+import json, pathlib, re, sys, tarfile
+allowed = {'RELEASE.json', 'compose.release.yml', 'compose.vps.yml', 'compose.assets.yml', 'compose.maintenance.yml', '.config/docker_example.yml', '.config/docker_example.env', 'scripts/deploy.sh', 'scripts/backup.sh', 'scripts/caddy/Dockerfile', 'scripts/caddy/cloudflare-proxies.caddy', 'scripts/caddy/camp-site.caddy'}
+root = pathlib.Path(sys.argv[2])
+with tarfile.open(sys.argv[1], 'r:gz') as archive:
+    members = archive.getmembers()
+    if len(members) != len(allowed) or {m.name for m in members} != allowed or any(not m.isfile() or m.size <= 0 or m.size > 4 * 1024 * 1024 for m in members):
+        sys.exit('Release 文件清单无效；未写入部署目录。')
+    release = json.load(archive.extractfile('RELEASE.json'))
+    if release.get('tag') != sys.argv[3] or not re.fullmatch('[a-f0-9]{40}', release.get('commit', '')):
+        sys.exit('Release 版本无效。')
+    for component in ('web', 'caddy'):
+        expected = 'ghcr.io/stellasora-cafe/trekker-camp' + ('-caddy' if component == 'caddy' else '') + '@sha256:'
+        if not re.fullmatch(re.escape(expected) + '[a-f0-9]{64}', release.get(component, '')):
+            sys.exit('Release 镜像必须固定到官方镜像摘要。')
+    expected = 'services:\n' + ''.join('  ' + key + ':\n    build: !reset null\n    image: ' + release[key] + '\n' for key in ('web', 'caddy'))
+    if archive.extractfile('compose.release.yml').read().decode() != expected:
+        sys.exit('Release Compose 与镜像摘要不一致。')
+    for member in members:
+        path = root / member.name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(archive.extractfile(member).read())
+        path.chmod(0o644)
+PY
+	bash -n "$destination/scripts/deploy.sh"
+	bash -n "$destination/scripts/backup.sh"
+)
+
 self_update() (
-	local prefix=${1:-/usr/local} download_dir remote_head revision name
+	local prefix=${1:-/usr/local} download_dir revision
 	umask 077
 	download_dir=$(mktemp -d)
-	trap 'rm -f -- "$download_dir/deploy.sh" "$download_dir/backup.sh"; rmdir -- "$download_dir"' EXIT
-	stage='下载 CLI 更新'
-	remote_head=$(GIT_TERMINAL_PROMPT=0 git -c credential.helper= ls-remote https://github.com/HePudding/trekker-camp.git refs/heads/master)
-	revision=${remote_head%%[[:space:]]*}
-	[[ $revision =~ ^[a-f0-9]{40}$ ]] || fail '无法读取 CLI 最新提交。'
-	for name in deploy.sh backup.sh; do
-		curl --fail --silent --show-error --location --proto '=https' \
-			"https://raw.githubusercontent.com/HePudding/trekker-camp/$revision/scripts/$name" -o "$download_dir/$name"
-	done
-	stage='安装 CLI 更新'
-	install_cli "$download_dir" "$revision" "$prefix"
+	trap 'rm -rf -- "$download_dir"' EXIT
+	stage='下载已发布的 CLI'
+	download_release "$download_dir" "${requested_release:-}"
+	revision=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["commit"])' "$download_dir/RELEASE.json")
+	install_cli "$download_dir/scripts" "$revision" "$prefix"
 	log "CLI 已更新：$revision"
 )
 
+prepare_release() {
+	local candidate
+	install -d -m 0755 "$camp_dir/.releases"
+	candidate=$(mktemp -d "$camp_dir/.releases/release-XXXXXX")
+	download_release "$candidate" "${requested_release:-}"
+	release_source=$candidate
+}
+
 resolve_storage() {
 	local requested=${1:-} saved="$camp_dir/.config/data-dir"
+	release_source=''
+	if [[ -s $camp_dir/.config/server-release ]]; then
+		release_source=$(< "$camp_dir/.config/server-release")
+		[[ $release_source == "$camp_dir/.releases/"* && -f $release_source/RELEASE.json ]] || fail '已保存的 Release 目录无效。'
+	fi
 	data_dir=$camp_dir
 	if [[ -f $saved ]]; then
 		data_dir=$(< "$saved")
@@ -330,7 +394,7 @@ EOF
 install_dependencies() {
 	local package
 	local missing=()
-	for package in ca-certificates curl git git-lfs openssl tzdata; do
+	for package in ca-certificates curl git git-lfs openssl tzdata python3; do
 		if [[ $(dpkg-query -W -f='${Status}' "$package" 2>/dev/null || true) != 'install ok installed' ]]; then
 			missing+=("$package")
 		fi
@@ -404,9 +468,18 @@ prepare_cloudflare() {
 }
 
 check_checkout() {
-	local directory=$1 repository=$2
+	local directory=$1 repository=$2 remote
 	[[ -e $directory/.git ]] || fail "$directory 不是独立 Git 工作副本。"
-	[[ $(git -C "$directory" config --get remote.origin.url) == "$repository" ]] || fail "$directory 的 origin 需为 $repository。"
+	remote=$(git -C "$directory" config --get remote.origin.url)
+	# Accept the team's transferred repository, including previous SSH checkouts.
+	remote=${remote%.git}
+	remote=${remote/#git@github.com:/https://github.com/}
+	remote=${remote/#ssh:\/\/git@github.com\//https://github.com/}
+	if [[ $remote == https://github.com/HePudding/trekker-camp || $remote == https://github.com/HePudding/trekker-camp-assets ]]; then
+		remote=${remote/\/HePudding\//\/stellasora-cafe\/}
+	fi
+	remote+=.git
+	[[ $remote == "$repository" ]] || fail "$directory 的 origin 需为 $repository。"
 	[[ $(git -C "$directory" symbolic-ref --quiet --short HEAD) == master ]] || fail "$directory 需位于 master 分支。"
 	[[ -z $(git -C "$directory" status --porcelain --untracked-files=all) ]] || fail "$directory 有本地改动，请先保存；部署已停止。"
 }
@@ -417,17 +490,19 @@ sync_checkout() {
 		github_git clone --branch master --single-branch "$repository" "$directory"
 	fi
 	check_checkout "$directory" "$repository"
-	github_git -C "$directory" fetch --no-tags origin master
+	# Use the canonical owner before authentication; do not rely on a redirect.
+	github_git -C "$directory" fetch --no-tags "$repository" refs/heads/master:refs/remotes/origin/master
 	git -C "$directory" merge-base --is-ancestor HEAD origin/master || fail "$directory 存在未发布提交或分叉，部署已停止。"
 	GIT_LFS_SKIP_SMUDGE=1 git -C "$directory" merge --ff-only origin/master
+	git -C "$directory" remote set-url origin "$repository"
 }
 
 check_deployment_source() {
 	local file
 	for file in compose.vps.yml compose.assets.yml .config/docker_example.yml .config/docker_example.env \
 		scripts/deploy.sh scripts/backup.sh scripts/caddy/Dockerfile scripts/caddy/cloudflare-proxies.caddy scripts/caddy/camp-site.caddy compose.maintenance.yml; do
-		[[ -s $camp_dir/$file ]] ||
-			fail "代码目录缺少部署文件：$file。请确认部署 CLI 已合入 master；测试未合并的 PR 时，CLI 与代码来源需使用同一测试版本。"
+		[[ -s ${release_source:-$camp_dir}/$file ]] ||
+			fail "Release 缺少部署文件：$file。"
 	done
 }
 
@@ -446,11 +521,11 @@ create_configuration() {
 		printf 'CLOUDFLARE_API_TOKEN=%s\n' "$cloudflare_token" > "$config_dir/cloudflare.env"
 		sed -e "s|^POSTGRES_PASSWORD=example-misskey-pass$|POSTGRES_PASSWORD=$password|" \
 			-e 's/^POSTGRES_USER=example-misskey-user$/POSTGRES_USER=misskey/' \
-			"$camp_dir/.config/docker_example.env" > "$config_dir/docker.env"
+			"${release_source:-$camp_dir}/.config/docker_example.env" > "$config_dir/docker.env"
 		sed -e "s|^url: https://example.tld/$|url: $site_url\nsetupPassword: '$setup_password'|" \
 			-e 's/^  user: example-misskey-user$/  user: misskey/' \
 			-e "s/^  pass: example-misskey-pass$/  pass: '$password'/" \
-			"$camp_dir/.config/docker_example.yml" > "$config_dir/default.yml"
+			"${release_source:-$camp_dir}/.config/docker_example.yml" > "$config_dir/default.yml"
 	)
 	chown root:991 "$config_dir/default.yml"
 	chmod 0640 "$config_dir/default.yml"
@@ -465,7 +540,7 @@ ${site_url#https://} {
 	import /etc/caddy/camp-site.caddy
 }
 EOF
-	cp "$camp_dir/compose.vps.yml" "$camp_dir/compose.yml"
+	cp "${release_source:-$camp_dir}/compose.vps.yml" "$camp_dir/compose.yml"
 	write_autostart_config always "$config_dir/compose.autostart.yml"
 	install -d -m 0755 -o 991 -g 991 "$data_dir/files"
 	if [[ $data_dir != "$camp_dir" ]]; then
@@ -477,11 +552,12 @@ compose() {
 	local caddy_data=caddy_data caddy_config=caddy_config
 	local overrides=()
 	if [[ $data_dir != "$camp_dir" ]]; then caddy_data=$data_dir/caddy/data; caddy_config=$data_dir/caddy/config; fi
-	if [[ -f $camp_dir/compose.maintenance.yml ]]; then overrides+=(-f "$camp_dir/compose.maintenance.yml"); fi
+	if [[ -f ${release_source:-$camp_dir}/compose.maintenance.yml ]]; then overrides+=(-f "${release_source:-$camp_dir}/compose.maintenance.yml"); fi
+	if [[ -n ${release_source:-} ]]; then overrides+=(-f "$release_source/compose.release.yml"); fi
 	if [[ -f $config_dir/compose.autostart.yml ]]; then overrides+=(-f "$config_dir/compose.autostart.yml"); fi
 	CAMP_DATA_DIR="$data_dir" CAMP_CADDY_DATA="$caddy_data" CAMP_CADDY_CONFIG="$caddy_config" \
 		CAMP_ASSETS_DIR="$assets_dir/public" docker compose --project-directory "$camp_dir" \
-		-f "$camp_dir/compose.yml" -f "$camp_dir/compose.assets.yml" "${overrides[@]}" "$@"
+		-f "$camp_dir/compose.yml" -f "${release_source:-$camp_dir}/compose.assets.yml" "${overrides[@]}" "$@"
 }
 
 write_autostart_config() {
@@ -561,6 +637,7 @@ if (meta.requireSetup) {
 }
 
 check_https() {
+	local path=${1:-/healthz}
 	stage='检查 HTTPS 入口'
 	site_url=$(sed -n 's/^url:[[:space:]]*//p' "$config_dir/default.yml")
 	log '等待 HTTPS 入口就绪；首次申请证书可能需要几分钟。'
@@ -570,14 +647,15 @@ check_https() {
 		error_log=$(mktemp "${TMPDIR:-/tmp}/camp-https-XXXXXX")
 		trap 'rm -f -- "$error_log"' EXIT
 		if ! curl --fail --silent --show-error --output /dev/null --retry 60 --retry-max-time 300 --retry-delay 5 --retry-all-errors \
-			--connect-timeout 5 --max-time 10 --resolve "${site_url#https://}:443:127.0.0.1" "$site_url/healthz" 2> "$error_log"; then
+			--connect-timeout 5 --max-time 10 --resolve "${site_url#https://}:443:127.0.0.1" "$site_url$path" 2> "$error_log"; then
 			tail -n 1 "$error_log" >&2
-			fail "HTTPS 入口等待超时。请运行 camp logs --dir \"$camp_dir\" 查看证书或 DNS 验证错误；修复后用 camp start --dir \"$camp_dir\" 重新检查。"
+			fail "HTTPS 入口等待超时。请运行 camp logs --dir \"$camp_dir\" 查看证书或 DNS 验证错误；修复后重试本次操作。"
 		fi
 	)
 }
 
 start_site() {
+	[[ ! -e $config_dir/maintenance/updating ]] || fail '上次更新尚未完成，请修复报错后运行 camp update；当前保持维护状态。'
 	stage='启动站点并检查健康状态'
 	compose config --quiet
 	compose up -d --no-build --pull never --wait --wait-timeout 180
@@ -591,6 +669,25 @@ stop_site() {
 	compose up -d --no-deps --no-build --pull never caddy
 	compose stop --timeout 60 web db redis
 	log '应用已停止，维护页入口、容器和数据已保留。'
+}
+
+begin_update_maintenance() {
+	local container_ids
+	local containers=()
+	stage='停止旧应用并进入维护状态'
+	install -d -m 0755 "$config_dir/maintenance"
+	: > "$config_dir/maintenance/updating"
+	# The currently installed proxy may predate the gate. Keep the old app stopped
+	# across a Docker/host restart until recreation applies the saved restart policy.
+	container_ids=$(compose ps --all --quiet web)
+	if [[ -n $container_ids ]]; then
+		mapfile -t containers <<< "$container_ids"
+		docker update --restart=no "${containers[@]}" >/dev/null
+	fi
+	# Stop before credentials, downloads or asset synchronization can delay the update.
+	compose stop --timeout 60 web
+	compose up -d --no-deps --no-build --pull never caddy
+	log '旧应用已停止；更新完成前持续显示维护页。'
 }
 
 use_image_start_command() (
@@ -680,13 +777,50 @@ prepare_cdn() (
 
 )
 
+archive_legacy_checkout() {
+	[[ -n ${release_source:-} && -d $camp_dir/.git ]] || return 0
+	local destination=$1 mounts
+	mounts=$(mktemp "$destination/compose-mounts-XXXXXX.json")
+	compose config --no-env-resolution --format json > "$mounts"
+	python3 - "$camp_dir" "$destination" "$mounts" <<'PY'
+import json, pathlib, shutil, sys
+root = pathlib.Path(sys.argv[1]).resolve()
+backup = pathlib.Path(sys.argv[2]).resolve()
+keep = {'.config', '.releases', '.env', 'compose.yml', 'db', 'redis', 'files', 'private-assets', 'caddy', 'backups', 'restic-cache'}
+# Custom bind mounts must keep their original paths when the containers restart.
+config = json.load(open(sys.argv[3]))
+for service in config.get('services', {}).values():
+    for env in service.get('env_file', []):
+        path = pathlib.Path(env['path'] if isinstance(env, dict) else env).resolve()
+        if path.is_relative_to(root):
+            keep.add(path.relative_to(root).parts[0])
+    for volume in service.get('volumes', []):
+        if volume.get('type') != 'bind':
+            continue
+        path = pathlib.Path(volume['source']).resolve()
+        if path == root:
+            sys.exit('存在挂载整个旧源码目录的自定义容器配置，请先调整挂载；旧源码已保留。')
+        if path.is_relative_to(root):
+            keep.add(path.relative_to(root).parts[0])
+if backup.is_relative_to(root):
+    keep.add(backup.relative_to(root).parts[0])
+archive = backup / 'legacy-source'
+archive.mkdir(mode=0o700)
+for entry in sorted(root.iterdir()):
+    if entry.name not in keep:
+        shutil.move(str(entry), str(archive / entry.name))
+print(f'旧源码及开发文件已归档：{archive}；配置、持久化数据和自定义挂载保持原路径。')
+PY
+	rm -f -- "$mounts"
+}
+
 deploy() {
-	local action=$1 maintenance_upgrade=0
+	local action=$1 maintenance_upgrade=0 probe_path=/healthz
 	stage='配置 CDN 访客 IP 识别'
 	prepare_cdn
-	stage='构建应用镜像'
+	stage='准备 Release 镜像'
 	compose config --quiet
-	compose build web caddy
+	if [[ -n ${release_source:-} ]]; then compose pull web caddy; else compose build web caddy; fi
 	check_application_runtime
 	if ! grep -Fq 'import /etc/caddy/camp-site.caddy' "$config_dir/Caddyfile"; then maintenance_upgrade=1; fi
 	upgrade_maintenance_config
@@ -705,7 +839,8 @@ deploy() {
 	chmod 0700 "$backup_dir"
 	(
 		umask 077
-		tar -czf "$backup_dir/config.tar.gz" -C "$data_dir" .config -C "$camp_dir" compose.yml compose.assets.yml
+		tar -czf "$backup_dir/config.tar.gz" -C "$data_dir" .config -C "$camp_dir" compose.yml -C "${release_source:-$camp_dir}" compose.assets.yml
+		if [[ -s $camp_dir/.config/server-release ]]; then cp "$camp_dir/.config/server-release" "$backup_dir/server-release"; fi
 		# PostgreSQL credentials are expanded inside the database container.
 		# shellcheck disable=SC2016
 		compose exec -T db sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup_dir/database.dump"
@@ -714,6 +849,12 @@ deploy() {
 	log "备份已保存：$backup_dir"
 	stage='使用 Misskey 镜像默认启动入口'
 	use_image_start_command
+	if [[ -n ${release_source:-} ]]; then
+		# Once migrations begin, subsequent starts must use this release too.
+		install -d -m 0755 "$camp_dir/.config"
+		printf '%s\n' "$release_source" > "$camp_dir/.config/server-release.new"
+		mv -f "$camp_dir/.config/server-release.new" "$camp_dir/.config/server-release"
+	fi
 	if [[ $action == install ]]; then
 		stage='初始化数据库'
 		compose run --rm --no-deps web pnpm run init
@@ -729,9 +870,29 @@ deploy() {
 	fi
 	stage='启动 HTTPS 入口'
 	compose up -d --wait --wait-timeout 60 caddy
-	check_https
+	# Validate TLS while the application is still hidden behind the maintenance gate.
+	if [[ -e $config_dir/maintenance/updating ]]; then probe_path=/__camp-maintenance/v1.html; fi
+	if ! check_https "$probe_path"; then
+		compose stop web
+		fail 'HTTPS 检查失败，应用已停止并保持维护状态。'
+	fi
 	stage='安装 camp 命令'
-	install_cli "$camp_dir/scripts" "$(git -C "$camp_dir" rev-parse HEAD)" /usr/local "$camp_dir"
+	if [[ -n ${release_source:-} ]]; then
+		install_cli "$release_source/scripts" "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["commit"])' "$release_source/RELEASE.json")" /usr/local "$camp_dir"
+	else
+		install_cli "$camp_dir/scripts" "$(git -C "$camp_dir" rev-parse HEAD)" /usr/local "$camp_dir"
+	fi
+	stage='归档旧源码工作副本'
+	archive_legacy_checkout "$backup_dir"
+	if [[ -e $config_dir/maintenance/updating ]]; then
+		stage='恢复站点访问'
+		rm -- "$config_dir/maintenance/updating"
+		if ! check_https; then
+			: > "$config_dir/maintenance/updating"
+			compose stop web
+			fail '站点入口检查失败，已恢复维护状态并停止应用。'
+		fi
+	fi
 	log "部署完成：$site_url。数据目录：$data_dir。使用 camp status 查看状态，camp logs 查看日志。"
 	compose ps
 	show_setup_status
@@ -748,6 +909,7 @@ main() {
 		camp_dir=$(< "$cli_dir/../deployment-dir")
 	fi
 	site_url=''
+	requested_release=''
 	github_token=${GH_TOKEN:-${GITHUB_TOKEN:-}}
 	cloudflare_token=${CLOUDFLARE_API_TOKEN:-}
 	unset GH_TOKEN GITHUB_TOKEN CLOUDFLARE_API_TOKEN
@@ -759,9 +921,9 @@ main() {
 	while (($#)); do
 		option=$1
 		case "$option" in
-			--dir|--url|--data-dir)
+			--dir|--url|--data-dir|--release)
 				if (($# < 2)) || [[ -z $2 || $2 == --* ]]; then fail "$option 缺少值。"; fi
-				case "$option" in --dir) camp_dir=$2 ;; --data-dir) requested_data_dir=$2 ;; --url) site_url=${2%/} ;; esac
+				case "$option" in --release) requested_release=$2 ;; --dir) camp_dir=$2 ;; --data-dir) requested_data_dir=$2 ;; --url) site_url=${2%/} ;; esac
 				shift 2 ;;
 			-h|--help) usage; return ;;
 			--version) cli_version; return ;;
@@ -833,6 +995,7 @@ main() {
 		stop) stop_site; return ;;
 		autostart) set_autostart "$autostart_mode"; return ;;
 	esac
+	if [[ $action == update ]]; then begin_update_maintenance; fi
 	stage='读取 GitHub 凭据'
 	prepare_auth
 	stage='读取 Cloudflare 凭据'
@@ -848,16 +1011,14 @@ main() {
 		systemctl enable --now docker
 	fi
 	docker info >/dev/null
-	# Validate both worktrees before advancing either repository.
-	if [[ -e $camp_dir/.git ]]; then check_checkout "$camp_dir" https://github.com/HePudding/trekker-camp.git; fi
-	if [[ -e $assets_dir/.git ]]; then check_checkout "$assets_dir" https://github.com/HePudding/trekker-camp-assets.git; fi
-	stage='同步代码和私有素材'
-	sync_checkout "$camp_dir" https://github.com/HePudding/trekker-camp.git
+	if [[ -e $assets_dir/.git ]]; then check_checkout "$assets_dir" https://github.com/stellasora-cafe/trekker-camp-assets.git; fi
+	stage='下载已发布的服务端 Release'
+	prepare_release
 	stage='检查部署文件'
 	check_deployment_source
 	stage='同步私有素材'
 	install -d -m 0755 "$data_dir"
-	sync_checkout "$assets_dir" https://github.com/HePudding/trekker-camp-assets.git
+	sync_checkout "$assets_dir" https://github.com/stellasora-cafe/trekker-camp-assets.git
 	git -C "$assets_dir" lfs install --local --skip-smudge
 	github_git -C "$assets_dir" lfs pull --include='public/**' --exclude=
 	[[ -d $assets_dir/public ]] || fail '素材仓库缺少 public/ 目录。'

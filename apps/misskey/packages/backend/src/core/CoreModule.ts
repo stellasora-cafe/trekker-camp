@@ -32,7 +32,9 @@ import { DriveService } from './DriveService.js';
 import { EmailService } from './EmailService.js';
 import { FederatedInstanceService } from './FederatedInstanceService.js';
 import { FetchInstanceMetadataService } from './FetchInstanceMetadataService.js';
+import { ClientSessionService } from './ClientSessionService.js';
 import { GlobalEventService } from './GlobalEventService.js';
+import { ClientResourcesService } from './ClientResourcesService.js';
 import { HashtagService } from './HashtagService.js';
 import { HttpRequestService } from './HttpRequestService.js';
 import { IdService } from './IdService.js';
@@ -332,7 +334,9 @@ const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting
 		EmailService,
 		FederatedInstanceService,
 		FetchInstanceMetadataService,
+		ClientSessionService,
 		GlobalEventService,
+		ClientResourcesService,
 		HashtagService,
 		HttpRequestService,
 		IdService,
@@ -635,7 +639,9 @@ const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting
 		EmailService,
 		FederatedInstanceService,
 		FetchInstanceMetadataService,
+		ClientSessionService,
 		GlobalEventService,
+		ClientResourcesService,
 		HashtagService,
 		HttpRequestService,
 		IdService,

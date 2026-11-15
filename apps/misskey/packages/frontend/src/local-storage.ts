@@ -8,6 +8,7 @@ export type Keys = (
 	'lastVersion' |
 	'instance' |
 	'instanceCachedAt' |
+	'clientResourcesRevision' |
 	'account' |
 	'latestDonationInfoShownAt' |
 	'neverShowDonationInfo' |

@@ -4,9 +4,15 @@
  */
 
 import { lang } from '@@/js/config.js';
+import { isDesktopClient } from '@/utility/offline.js';
 
 export async function initializeSw() {
 	if (!('serviceWorker' in navigator)) return;
+	if (isDesktopClient()) {
+		const registrations = await navigator.serviceWorker.getRegistrations();
+		await Promise.all(registrations.map(registration => registration.unregister()));
+		return;
+	}
 
 	navigator.serviceWorker.register('/sw.js', { scope: '/', type: 'classic' });
 	navigator.serviceWorker.ready.then(registration => {

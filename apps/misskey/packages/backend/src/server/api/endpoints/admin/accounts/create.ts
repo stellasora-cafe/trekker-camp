@@ -7,18 +7,21 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import type { MiMeta, UsersRepository } from '@/models/_.js';
 import { SignupService } from '@/core/SignupService.js';
+import { ClientSessionService, clientDeviceFromHeaders } from '@/core/ClientSessionService.js';
 import { RoleService } from '@/core/RoleService.js';
 import { UserEntityService } from '@/core/entities/UserEntityService.js';
 import { localUsernameSchema, passwordSchema } from '@/models/User.js';
 import { DI } from '@/di-symbols.js';
 import type { Config } from '@/config.js';
 import { ApiError } from '@/server/api/error.js';
+import { clientSessionErrors } from '@/server/api/client-session-errors.js';
 import { Packed } from '@/misc/json-schema.js';
 
 export const meta = {
 	tags: ['admin'],
 
 	errors: {
+		clientProtocolRequired: clientSessionErrors.clientProtocolRequired,
 		accessDenied: {
 			message: 'Access denied.',
 			code: 'ACCESS_DENIED',
@@ -78,9 +81,12 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 		private userEntityService: UserEntityService,
 		private signupService: SignupService,
+		private clientSessionService: ClientSessionService,
 		private roleService: RoleService,
 	) {
-		super(meta, paramDef, async (ps, _me, token) => {
+		super(meta, paramDef, async (ps, _me, token, _file, _cleanup, ip, headers) => {
+			const protocol = headers?.['x-camp-client'];
+			if (protocol !== 'web-v1' && protocol !== 'desktop-v1') throw new ApiError(meta.errors.clientProtocolRequired);
 			const me = _me ? await this.usersRepository.findOneByOrFail({ id: _me.id }) : null;
 
 			if (this.serverSettings.rootUserId == null && me == null && token == null) {
@@ -100,7 +106,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.accessDenied);
 			}
 
-			const { account, secret } = await this.signupService.signup({
+			const { account } = await this.signupService.signup({
 				username: ps.username,
 				password: ps.password,
 				ignorePreservedUsernames: true,
@@ -111,7 +117,9 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				includeSecrets: true,
 			}) as Packed<'MeDetailed'> & { token: string };
 
-			res.token = secret;
+			const session = await this.clientSessionService.issue(account.id, protocol === 'desktop-v1' ? 'desktop' : 'web',
+				clientDeviceFromHeaders(headers ?? {}), ip ?? '', headers?.['user-agent'] ?? '');
+			res.token = session.token;
 
 			return res;
 		});

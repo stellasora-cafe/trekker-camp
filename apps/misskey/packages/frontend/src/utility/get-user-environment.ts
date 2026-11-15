@@ -17,6 +17,21 @@ export type UserEnvironment = {
 	viaGetHighEntropyValues: false;
 };
 
+type ClientNavigator = Pick<Navigator, 'userAgent' | 'platform'> & {
+	userAgentData?: { platform?: string };
+};
+
+export function getWebDeviceHeaders(environment: ClientNavigator = navigator): Record<string, string> {
+	const ua = environment.userAgent;
+	const platform = environment.userAgentData?.platform ||
+		(/Windows/i.test(ua) ? 'Windows' : /Android/i.test(ua) ? 'Android' : /iPhone|iPad|iPod/i.test(ua) ? 'iOS' : /Macintosh|Mac OS X/i.test(ua) ? 'macOS' : /Linux/i.test(ua) ? 'Linux' : environment.platform || 'Unknown');
+	const browser = /Edg(?:e|A|iOS)?\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox\/|FxiOS\//.test(ua) ? 'Firefox' : /Chrome\/|CriOS\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Web browser';
+	return {
+		'X-Camp-Device-Name': encodeURIComponent(`${browser} (${platform})`),
+		'X-Camp-Device-Platform': platform.replace(/[^\x20-\x7e]/g, '').slice(0, 100) || 'Unknown',
+	};
+}
+
 export async function getUserEnvironment(): Promise<UserEnvironment> {
 	if ('userAgentData' in navigator && navigator.userAgentData != null) {
 		try {

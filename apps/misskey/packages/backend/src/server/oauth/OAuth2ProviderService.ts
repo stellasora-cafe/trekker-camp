@@ -27,6 +27,7 @@ import { DI } from '@/di-symbols.js';
 import { bindThis } from '@/decorators.js';
 import type { AccessTokensRepository, UsersRepository } from '@/models/_.js';
 import { IdService } from '@/core/IdService.js';
+import { ClientSessionService } from '@/core/ClientSessionService.js';
 import { CacheService } from '@/core/CacheService.js';
 import type { MiLocalUser } from '@/models/User.js';
 import { MemoryKVCache } from '@/misc/cache.js';
@@ -410,6 +411,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 		private usersRepository: UsersRepository,
 		private idService: IdService,
 		private httpRequestService: HttpRequestService,
+		private clientSessionService: ClientSessionService,
 		private cacheService: CacheService,
 		private htmlTemplateService: HtmlTemplateService,
 		loggerService: LoggerService,
@@ -497,7 +499,13 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 		};
 	}
 
-	async #findUserByLoginToken(loginToken: string): Promise<MiLocalUser> {
+	async #findUserByLoginToken(loginToken: string, desktop = false): Promise<MiLocalUser> {
+		if (loginToken.startsWith('cs_')) {
+			const session = await this.clientSessionService.authenticate(loginToken, desktop ? 'desktop' : 'web');
+			if (!session) throw new InvalidRequestError('No such user');
+			return session.user;
+		}
+		if (desktop) throw new InvalidRequestError('Client session required');
 		const user = await this.cacheService.localUserByNativeTokenCache.fetch(loginToken,
 			() => this.usersRepository.findOneBy({ token: loginToken }) as Promise<MiLocalUser | null>);
 		if (!user) {
@@ -614,7 +622,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 				}
 
 				this.#logger.info(`Checking the user before sending authorization code to ${transaction.client.id}`);
-				const user = await this.#findUserByLoginToken(loginToken);
+				const user = await this.#findUserByLoginToken(loginToken, request.headers['x-camp-client'] === 'desktop-v1');
 
 				this.#logger.info(`Sending authorization code on behalf of user ${user.id} to ${transaction.client.id} through ${transaction.request.redirectUri}, with scope: [${transaction.request.scopes}]`);
 
@@ -656,6 +664,9 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 
 		fastify.post('', async (request, reply) => {
 			applyNoStore(reply);
+			if (request.headers['x-camp-client'] !== 'third-party-v1') {
+				return sendOAuthProviderError(reply, createForbiddenAccessDenied('X-Camp-Client: third-party-v1 is required'));
+			}
 
 			try {
 				const body = toRequestParameters(request.body);

@@ -16,7 +16,7 @@ import {
 	waitApiResponse, signIn,
 } from './utils.js';
 import type { RegisteredUser } from './utils.js';
-import { fillSignupPhone } from './shared.js';
+import { api, fillSignupPhone } from './shared.js';
 
 test.describe('Before setup instance', () => {
 	test.beforeEach(async ({ request }) => {
@@ -137,11 +137,9 @@ test.describe('After user signup', () => {
 	});
 
 	test('suspend', async ({ page }) => {
-		await page.request.post(`${BASE_URL}/api/admin/suspend-user`, {
-			data: {
-				i: admin.token,
-				userId: alice.id,
-			},
+		await api(BASE_URL, 'admin/suspend-user', {
+			i: admin.token,
+			userId: alice.id,
 		});
 
 		await visitHome(page);

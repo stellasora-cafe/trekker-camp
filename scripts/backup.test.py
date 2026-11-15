@@ -104,6 +104,18 @@ apt-get() { :; }
     def events(self):
         return (self.root / "events").read_text().splitlines()
 
+    def test_release_backup_uses_manifest_without_a_code_checkout(self):
+        release = self.camp / ".releases/version"
+        release.mkdir(parents=True)
+        (release / "RELEASE.json").write_text('{"commit":"' + 'a' * 40 + '"}')
+        (release / "compose.release.yml").write_text("services: {}\n")
+        (self.camp / "compose.assets.yml").rename(release / "compose.assets.yml")
+        (self.camp / ".config/server-release").write_text(str(release))
+        self.shell(COMPOSE + UPLOAD + "git() { return 1; }; r2_backup")
+        self.assertEqual((self.root / "uploaded/code-revision").read_text().strip(), "a" * 40)
+        self.assertTrue((self.root / "uploaded/compose.release.yml").is_file())
+        self.assertTrue((self.root / "uploaded/compose.assets.yml").is_file())
+
     def test_capture_resumes_site_before_upload_and_excludes_source_secrets(self):
         self.shell(COMPOSE + UPLOAD + "r2_backup")
         events = self.events()

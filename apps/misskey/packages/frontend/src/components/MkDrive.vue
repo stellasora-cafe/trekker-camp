@@ -714,7 +714,7 @@ useGlobalEvent('driveFileCreated', (file) => {
 	}
 });
 
-useGlobalEvent('driveFilesUpdated', (files) => {
+function updateDriveFiles(files: Misskey.entities.DriveFile[]) {
 	for (const f of files) {
 		if (filesPaginator.items.value.some(x => x.id === f.id)) {
 			if (f.folderId === (folder.value?.id ?? null)) {
@@ -728,7 +728,9 @@ useGlobalEvent('driveFilesUpdated', (files) => {
 			}
 		}
 	}
-});
+}
+
+useGlobalEvent('driveFilesUpdated', updateDriveFiles);
 
 useGlobalEvent('driveFilesDeleted', (files) => {
 	for (const f of files) {
@@ -736,7 +738,7 @@ useGlobalEvent('driveFilesDeleted', (files) => {
 	}
 });
 
-useGlobalEvent('driveFoldersUpdated', (folders) => {
+function updateDriveFolders(folders: Misskey.entities.DriveFolder[]) {
 	for (const f of folders) {
 		if (foldersPaginator.items.value.some(x => x.id === f.id)) {
 			if (f.parentId === (folder.value?.id ?? null)) {
@@ -750,7 +752,9 @@ useGlobalEvent('driveFoldersUpdated', (folders) => {
 			}
 		}
 	}
-});
+}
+
+useGlobalEvent('driveFoldersUpdated', updateDriveFolders);
 
 useGlobalEvent('driveFoldersDeleted', (folders) => {
 	for (const f of folders) {
@@ -758,13 +762,57 @@ useGlobalEvent('driveFoldersDeleted', (folders) => {
 	}
 });
 
+let recovering = false;
+let driveDisposed = false;
+let disconnectedFileId: string | null | undefined;
+let disconnectedFolderId: string | null | undefined;
+
+function rememberDrivePosition() {
+	disconnectedFileId = filesPaginator.getNewestId();
+	disconnectedFolderId = foldersPaginator.getNewestId();
+}
+
+async function recoverDrive() {
+	if (recovering || fetching.value) return;
+	recovering = true;
+	const folderId = folder.value?.id ?? null;
+	const current = () => !driveDisposed && (folder.value?.id ?? null) === folderId;
+	try {
+		await Promise.allSettled([
+			filesPaginator.fetchNewer({ sinceId: disconnectedFileId, catchUp: true }),
+			foldersPaginator.fetchNewer({ sinceId: disconnectedFolderId, catchUp: true }),
+			...filesPaginator.items.value.map(async file => {
+				try {
+					const updated = await misskeyApi('drive/files/show', { fileId: file.id });
+					if (current()) updateDriveFiles([updated]);
+				} catch (error) {
+					if (current() && (error as { code?: string })?.code === 'NO_SUCH_FILE') filesPaginator.removeItem(file.id);
+				}
+			}),
+			...foldersPaginator.items.value.map(async item => {
+				try {
+					const updated = await misskeyApi('drive/folders/show', { folderId: item.id });
+					if (current()) updateDriveFolders([updated]);
+				} catch (error) {
+					if (current() && (error as { code?: string })?.code === 'NO_SUCH_FOLDER') foldersPaginator.removeItem(item.id);
+				}
+			}),
+		]);
+	} finally { recovering = false; }
+}
+
 let connection: Misskey.IChannelConnection<Misskey.Channels['drive']> | null = null;
 
 onMounted(() => {
-	if (store.s.realtimeMode) {
-		connection = useStream().useChannel('drive');
-		connection.on('fileCreated', onStreamDriveFileCreated);
-	}
+	connection = useStream().useChannel('drive');
+	connection.on('fileCreated', onStreamDriveFileCreated);
+	connection.on('fileUpdated', file => updateDriveFiles([file]));
+	connection.on('fileDeleted', filesPaginator.removeItem);
+	connection.on('folderCreated', item => updateDriveFolders([item]));
+	connection.on('folderUpdated', item => updateDriveFolders([item]));
+	connection.on('folderDeleted', foldersPaginator.removeItem);
+	useStream().on('_disconnected_', rememberDrivePosition);
+	useStream().on('_reconnected_', recoverDrive);
 
 	if (props.initialFolder) {
 		cd(props.initialFolder);
@@ -777,6 +825,9 @@ onActivated(() => {
 });
 
 onBeforeUnmount(() => {
+	driveDisposed = true;
+	useStream().off('_disconnected_', rememberDrivePosition);
+	useStream().off('_reconnected_', recoverDrive);
 	if (connection != null) {
 		connection.dispose();
 	}

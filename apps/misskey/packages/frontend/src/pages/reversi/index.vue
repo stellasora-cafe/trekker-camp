@@ -4,104 +4,106 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<div v-if="!matchingAny && !matchingUser" class="_spacer" style="--MI_SPACER-w: 600px;">
-	<div class="_gaps">
-		<div>
-			<img :src="'/client-assets/trekker-camp/characters/maou/reversi-logo-v1.png'" style="display: block; max-width: 100%; max-height: 200px; margin: auto;"/>
-		</div>
-
-		<div class="_panel _gaps" style="padding: 16px;">
-			<div class="_buttonsCenter">
-				<MkButton primary gradate rounded @click="matchAny">{{ i18n.ts._reversi.freeMatch }}</MkButton>
-				<MkButton primary gradate rounded @click="matchUser">{{ i18n.ts.invite }}</MkButton>
+<PageWithHeader>
+	<div v-if="!matchingAny && !matchingUser" class="_spacer" style="--MI_SPACER-w: 600px;">
+		<div class="_gaps">
+			<div>
+				<img :src="'/client-assets/trekker-camp/characters/maou/reversi-logo-v1.png'" style="display: block; max-width: 100%; max-height: 200px; margin: auto;"/>
 			</div>
-			<div style="font-size: 90%; opacity: 0.7; text-align: center;"><i class="ti ti-music"></i> {{ i18n.ts.soundWillBePlayed }}</div>
-		</div>
 
-		<MkFolder v-if="invitations.length > 0" :defaultOpen="true">
-			<template #label>{{ i18n.ts.invitations }}</template>
-			<div class="_gaps_s">
-				<button v-for="user in invitations" :key="user.id" v-panel :class="$style.invitation" class="_button" tabindex="-1" @click="accept(user)">
-					<MkAvatar style="width: 32px; height: 32px; margin-right: 8px;" :user="user" :showIndicator="true"/>
-					<span style="margin-right: 8px;"><b><MkUserName :user="user"/></b></span>
-					<span>@{{ user.username }}</span>
-				</button>
+			<div class="_panel _gaps" style="padding: 16px;">
+				<div class="_buttonsCenter">
+					<MkButton primary gradate rounded @click="matchAny">{{ i18n.ts._reversi.freeMatch }}</MkButton>
+					<MkButton primary gradate rounded @click="matchUser">{{ i18n.ts.invite }}</MkButton>
+				</div>
+				<div style="font-size: 90%; opacity: 0.7; text-align: center;"><i class="ti ti-music"></i> {{ i18n.ts.soundWillBePlayed }}</div>
 			</div>
-		</MkFolder>
 
-		<MkFolder v-if="$i" :defaultOpen="true">
-			<template #label>{{ i18n.ts._reversi.myGames }}</template>
-			<MkPagination :paginator="myGamesPaginator">
-				<template #default="{ items }">
-					<div :class="$style.gamePreviews">
-						<MkA v-for="g in items" :key="g.id" v-panel :class="[$style.gamePreview, !g.isStarted && !g.isEnded && $style.gamePreviewWaiting, g.isStarted && !g.isEnded && $style.gamePreviewActive]" tabindex="-1" :to="`/reversi/g/${g.id}`">
-							<div :class="$style.gamePreviewPlayers">
-								<span v-if="g.winnerId === g.user1Id" style="margin-right: 0.75em; color: var(--MI_THEME-accent); font-weight: bold;"><i class="ti ti-trophy"></i></span>
-								<span v-if="g.winnerId === g.user2Id" style="margin-right: 0.75em; visibility: hidden;"><i class="ti ti-x"></i></span>
-								<MkAvatar :class="$style.gamePreviewPlayersAvatar" :user="g.user1"/>
-								<span style="margin: 0 1em;">vs</span>
-								<MkAvatar :class="$style.gamePreviewPlayersAvatar" :user="g.user2"/>
-								<span v-if="g.winnerId === g.user1Id" style="margin-left: 0.75em; visibility: hidden;"><i class="ti ti-x"></i></span>
-								<span v-if="g.winnerId === g.user2Id" style="margin-left: 0.75em; color: var(--MI_THEME-accent); font-weight: bold;"><i class="ti ti-trophy"></i></span>
-							</div>
-							<div :class="$style.gamePreviewFooter">
-								<span v-if="g.isStarted && !g.isEnded" :class="$style.gamePreviewStatusActive">{{ i18n.ts._reversi.playing }}</span>
-								<span v-else-if="!g.isEnded" :class="$style.gamePreviewStatusWaiting"><MkEllipsis/></span>
-								<span v-else>{{ i18n.ts._reversi.ended }}</span>
-								<MkTime style="margin-left: auto; opacity: 0.7;" :time="g.createdAt"/>
-							</div>
-						</MkA>
-					</div>
-				</template>
-			</MkPagination>
-		</MkFolder>
+			<MkFolder v-if="invitations.length > 0" :defaultOpen="true">
+				<template #label>{{ i18n.ts.invitations }}</template>
+				<div class="_gaps_s">
+					<button v-for="user in invitations" :key="user.id" v-panel :class="$style.invitation" class="_button" tabindex="-1" @click="accept(user)">
+						<MkAvatar style="width: 32px; height: 32px; margin-right: 8px;" :user="user" :showIndicator="true"/>
+						<span style="margin-right: 8px;"><b><MkUserName :user="user"/></b></span>
+						<span>@{{ user.username }}</span>
+					</button>
+				</div>
+			</MkFolder>
 
-		<MkFolder :defaultOpen="true">
-			<template #label>{{ i18n.ts._reversi.allGames }}</template>
-			<MkPagination :paginator="gamesPaginator">
-				<template #default="{ items }">
-					<div :class="$style.gamePreviews">
-						<MkA v-for="g in items" :key="g.id" v-panel :class="[$style.gamePreview, !g.isStarted && !g.isEnded && $style.gamePreviewWaiting, g.isStarted && !g.isEnded && $style.gamePreviewActive]" tabindex="-1" :to="`/reversi/g/${g.id}`">
-							<div :class="$style.gamePreviewPlayers">
-								<span v-if="g.winnerId === g.user1Id" style="margin-right: 0.75em; color: var(--MI_THEME-accent); font-weight: bold;"><i class="ti ti-trophy"></i></span>
-								<span v-if="g.winnerId === g.user2Id" style="margin-right: 0.75em; visibility: hidden;"><i class="ti ti-x"></i></span>
-								<MkAvatar :class="$style.gamePreviewPlayersAvatar" :user="g.user1"/>
-								<span style="margin: 0 1em;">vs</span>
-								<MkAvatar :class="$style.gamePreviewPlayersAvatar" :user="g.user2"/>
-								<span v-if="g.winnerId === g.user1Id" style="margin-left: 0.75em; visibility: hidden;"><i class="ti ti-x"></i></span>
-								<span v-if="g.winnerId === g.user2Id" style="margin-left: 0.75em; color: var(--MI_THEME-accent); font-weight: bold;"><i class="ti ti-trophy"></i></span>
-							</div>
-							<div :class="$style.gamePreviewFooter">
-								<span v-if="g.isStarted && !g.isEnded" :class="$style.gamePreviewStatusActive">{{ i18n.ts._reversi.playing }}</span>
-								<span v-else-if="!g.isEnded" :class="$style.gamePreviewStatusWaiting"><MkEllipsis/></span>
-								<span v-else>{{ i18n.ts._reversi.ended }}</span>
-								<MkTime style="margin-left: auto; opacity: 0.7;" :time="g.createdAt"/>
-							</div>
-						</MkA>
-					</div>
-				</template>
-			</MkPagination>
-		</MkFolder>
-	</div>
-</div>
-<div v-else class="_spacer" style="--MI_SPACER-w: 600px;">
-	<div :class="$style.waitingScreen">
-		<div v-if="matchingUser" :class="$style.waitingScreenTitle">
-			<I18n :src="i18n.ts.waitingFor" tag="span">
-				<template #x>
-					<b><MkUserName :user="matchingUser"/></b>
-				</template>
-			</I18n>
-			<MkEllipsis/>
-		</div>
-		<div v-else :class="$style.waitingScreenTitle">
-			{{ i18n.ts._reversi.lookingForPlayer }}<MkEllipsis/>
-		</div>
-		<div class="cancel">
-			<MkButton inline rounded @click="cancelMatching">{{ i18n.ts.cancel }}</MkButton>
+			<MkFolder v-if="$i" :defaultOpen="true">
+				<template #label>{{ i18n.ts._reversi.myGames }}</template>
+				<MkPagination :paginator="myGamesPaginator">
+					<template #default="{ items }">
+						<div :class="$style.gamePreviews">
+							<MkA v-for="g in items" :key="g.id" v-panel :class="[$style.gamePreview, !g.isStarted && !g.isEnded && $style.gamePreviewWaiting, g.isStarted && !g.isEnded && $style.gamePreviewActive]" tabindex="-1" :to="`/reversi/g/${g.id}`">
+								<div :class="$style.gamePreviewPlayers">
+									<span v-if="g.winnerId === g.user1Id" style="margin-right: 0.75em; color: var(--MI_THEME-accent); font-weight: bold;"><i class="ti ti-trophy"></i></span>
+									<span v-if="g.winnerId === g.user2Id" style="margin-right: 0.75em; visibility: hidden;"><i class="ti ti-x"></i></span>
+									<MkAvatar :class="$style.gamePreviewPlayersAvatar" :user="g.user1"/>
+									<span style="margin: 0 1em;">vs</span>
+									<MkAvatar :class="$style.gamePreviewPlayersAvatar" :user="g.user2"/>
+									<span v-if="g.winnerId === g.user1Id" style="margin-left: 0.75em; visibility: hidden;"><i class="ti ti-x"></i></span>
+									<span v-if="g.winnerId === g.user2Id" style="margin-left: 0.75em; color: var(--MI_THEME-accent); font-weight: bold;"><i class="ti ti-trophy"></i></span>
+								</div>
+								<div :class="$style.gamePreviewFooter">
+									<span v-if="g.isStarted && !g.isEnded" :class="$style.gamePreviewStatusActive">{{ i18n.ts._reversi.playing }}</span>
+									<span v-else-if="!g.isEnded" :class="$style.gamePreviewStatusWaiting"><MkEllipsis/></span>
+									<span v-else>{{ i18n.ts._reversi.ended }}</span>
+									<MkTime style="margin-left: auto; opacity: 0.7;" :time="g.createdAt"/>
+								</div>
+							</MkA>
+						</div>
+					</template>
+				</MkPagination>
+			</MkFolder>
+
+			<MkFolder :defaultOpen="true">
+				<template #label>{{ i18n.ts._reversi.allGames }}</template>
+				<MkPagination :paginator="gamesPaginator">
+					<template #default="{ items }">
+						<div :class="$style.gamePreviews">
+							<MkA v-for="g in items" :key="g.id" v-panel :class="[$style.gamePreview, !g.isStarted && !g.isEnded && $style.gamePreviewWaiting, g.isStarted && !g.isEnded && $style.gamePreviewActive]" tabindex="-1" :to="`/reversi/g/${g.id}`">
+								<div :class="$style.gamePreviewPlayers">
+									<span v-if="g.winnerId === g.user1Id" style="margin-right: 0.75em; color: var(--MI_THEME-accent); font-weight: bold;"><i class="ti ti-trophy"></i></span>
+									<span v-if="g.winnerId === g.user2Id" style="margin-right: 0.75em; visibility: hidden;"><i class="ti ti-x"></i></span>
+									<MkAvatar :class="$style.gamePreviewPlayersAvatar" :user="g.user1"/>
+									<span style="margin: 0 1em;">vs</span>
+									<MkAvatar :class="$style.gamePreviewPlayersAvatar" :user="g.user2"/>
+									<span v-if="g.winnerId === g.user1Id" style="margin-left: 0.75em; visibility: hidden;"><i class="ti ti-x"></i></span>
+									<span v-if="g.winnerId === g.user2Id" style="margin-left: 0.75em; color: var(--MI_THEME-accent); font-weight: bold;"><i class="ti ti-trophy"></i></span>
+								</div>
+								<div :class="$style.gamePreviewFooter">
+									<span v-if="g.isStarted && !g.isEnded" :class="$style.gamePreviewStatusActive">{{ i18n.ts._reversi.playing }}</span>
+									<span v-else-if="!g.isEnded" :class="$style.gamePreviewStatusWaiting"><MkEllipsis/></span>
+									<span v-else>{{ i18n.ts._reversi.ended }}</span>
+									<MkTime style="margin-left: auto; opacity: 0.7;" :time="g.createdAt"/>
+								</div>
+							</MkA>
+						</div>
+					</template>
+				</MkPagination>
+			</MkFolder>
 		</div>
 	</div>
-</div>
+	<div v-else class="_spacer" style="--MI_SPACER-w: 600px;">
+		<div :class="$style.waitingScreen">
+			<div v-if="matchingUser" :class="$style.waitingScreenTitle">
+				<I18n :src="i18n.ts.waitingFor" tag="span">
+					<template #x>
+						<b><MkUserName :user="matchingUser"/></b>
+					</template>
+				</I18n>
+				<MkEllipsis/>
+			</div>
+			<div v-else :class="$style.waitingScreenTitle">
+				{{ i18n.ts._reversi.lookingForPlayer }}<MkEllipsis/>
+			</div>
+			<div class="cancel">
+				<MkButton inline rounded @click="cancelMatching">{{ i18n.ts.cancel }}</MkButton>
+			</div>
+		</div>
+	</div>
+</PageWithHeader>
 </template>
 
 <script lang="ts" setup>

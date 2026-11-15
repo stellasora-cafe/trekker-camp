@@ -2,7 +2,7 @@
 
 本指南记录旅人营地本站及团队的开发流程，其他使用者可自行参考。本项目不主动提供第三方部署、配置和运维支持；代码仍可依照适用许可证使用，详见 [项目定位与支持范围](README.md#项目定位与支持范围)。
 
-- 仓库：[HePudding/trekker-camp](https://github.com/HePudding/trekker-camp)
+- 仓库：[stellasora-cafe/trekker-camp](https://github.com/stellasora-cafe/trekker-camp)
 - 默认分支：`master`（本站日常开发与交付目标）
 - 版本锚点（以仓库文件为准）：`.node-version` → Node **26.13.1**，`package.json#packageManager` → **pnpm@12.17.0**（当前 `2026.11.0` / nasubi）。
 
@@ -13,7 +13,7 @@
 适合已经装好 Node / pnpm / FFmpeg 的机器。
 
 ```bash
-git clone https://github.com/HePudding/trekker-camp.git
+git clone https://github.com/stellasora-cafe/trekker-camp.git
 cd trekker-camp
 git checkout master
 
@@ -40,7 +40,7 @@ pnpm dev
 
 `pnpm dev` 会 watch 后端并透过 Vite HMR 跑前端；生产行为应使用生产构建验证。
 
-团队成员先运行 `pnpm assets:pull` 从 `HePudding/trekker-camp-assets` 私有仓库取得素材。营地美术独立存放在 `private-assets/public/`，`pnpm dev` 会自动将其连接到 `/client-assets/camp/`，离线也可使用。该目录不进入公开 Git 仓库、源码包和 Docker 镜像。团队协作、多个 worktree 共用素材和自动部署步骤见 [素材开发与部署](ASSETS.md)。
+团队成员先运行 `pnpm assets:pull` 从 `stellasora-cafe/trekker-camp-assets` 私有仓库取得素材。营地美术独立存放在 `private-assets/public/`，`pnpm dev` 会自动将其连接到 `/client-assets/camp/`，离线也可使用。该目录不进入公开 Git 仓库、源码包和 Docker 镜像。团队协作、多个 worktree 共用素材和自动部署步骤见 [素材开发与部署](ASSETS.md)。
 
 ### 测试用配置
 

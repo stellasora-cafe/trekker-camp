@@ -74,6 +74,7 @@ export function uploadFile(file: File | Blob, options: {
 		}, { once: true });
 
 		xhr.open('POST', apiUrl + '/drive/files/create', true);
+		xhr.setRequestHeader('X-Camp-Client', 'web-v1');
 		xhr.onload = ((ev: ProgressEvent<XMLHttpRequest>) => {
 			if (xhr.status !== 200 || ev.target == null || ev.target.response == null) {
 				if (xhr.status === 413) {

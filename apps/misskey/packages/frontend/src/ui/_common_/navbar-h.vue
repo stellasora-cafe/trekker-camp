@@ -4,8 +4,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<div :class="[$style.root, acrylic ? $style.acrylic : null]">
-	<div :class="$style.body">
+<div class="_campWindowHeader" :class="[$style.root, acrylic ? $style.acrylic : null]" data-camp-window-drag>
+	<div ref="body" :class="$style.body">
 		<div>
 			<button v-click-anime :class="[$style.item, $style.instance]" class="_button" @click="openInstanceMenu">
 				<img :class="$style.instanceIcon" :src="instance.iconUrl ?? '/favicon.ico'" draggable="false"/>
@@ -47,7 +47,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { computed, defineAsyncComponent, onMounted, ref } from 'vue';
+import { computed, defineAsyncComponent, onMounted, ref, useTemplateRef } from 'vue';
 import { openInstanceMenu } from './common.js';
 import * as os from '@/os.js';
 import { navbarItemDef } from '@/navbar.js';
@@ -58,8 +58,11 @@ import { prefer } from '@/preferences.js';
 import { getAccountMenu } from '@/accounts.js';
 import { $i } from '@/i.js';
 import { getHTMLElementOrNull } from '@/utility/get-dom-node-or-null.js';
+import { useDesktopControlsInset } from '@/composables/use-desktop-controls-inset.js';
 
 const WINDOW_THRESHOLD = 1400;
+const body = useTemplateRef('body');
+const controlsInset = useDesktopControlsInset(body);
 
 const props = defineProps<{
 	acrylic?: boolean;
@@ -106,7 +109,7 @@ onMounted(() => {
 
 <style lang="scss" module>
 .root {
-	--height: 60px;
+	--height: var(--camp-window-header-height, 60px);
 
 	position: sticky;
 	top: 0;
@@ -124,6 +127,8 @@ onMounted(() => {
 }
 
 .body {
+	box-sizing: border-box;
+	padding-right: v-bind("controlsInset + 'px'");
 	max-width: 1380px;
 	margin: 0 auto;
 	display: flex;

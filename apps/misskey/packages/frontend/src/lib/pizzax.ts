@@ -160,7 +160,7 @@ export class Pizzax<T extends StateDef> {
 
 							return set(this.registryCacheKeyName, cache);
 						})
-						.then(() => resolve());
+						.then(() => resolve(), () => resolve());
 				}, 1);
 			} else {
 				resolve();

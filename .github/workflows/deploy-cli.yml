@@ -5,6 +5,9 @@ on:
   push:
     branches: [master]
     paths:
+      - scripts/build-server-release.py
+      - scripts/server-release.test.py
+      - .github/workflows/server-release.yml
       - scripts/deploy.sh
       - scripts/deploy.test.py
       - scripts/maintenance.test.py
@@ -31,6 +34,9 @@ on:
   pull_request:
     branches: [master]
     paths:
+      - scripts/build-server-release.py
+      - scripts/server-release.test.py
+      - .github/workflows/server-release.yml
       - scripts/deploy.sh
       - scripts/deploy.test.py
       - scripts/maintenance.test.py

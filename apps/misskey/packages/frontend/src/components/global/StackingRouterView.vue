@@ -31,7 +31,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<component :is="tab.component" v-bind="Object.fromEntries(tab.props)"/>
 
 					<template #fallback>
-						<MkLoading/>
+						<MkLoadingPage/>
 					</template>
 				</Suspense>
 			</div>
@@ -57,8 +57,9 @@ const router = props.router ?? inject(DI.router);
 if (router == null) {
 	throw new Error('no router provided');
 }
+provide(DI.router, router);
 
-const currentDepth = inject(DI.routerCurrentDepth, 0);
+const currentDepth = props.router != null ? 0 : inject(DI.routerCurrentDepth, 0);
 provide(DI.routerCurrentDepth, currentDepth + 1);
 
 const tabs = shallowRef([{

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { createApp, defineAsyncComponent, markRaw } from 'vue';
+import { defineAsyncComponent, markRaw } from 'vue';
 import { ui } from '@@/js/config.js';
 import * as Misskey from 'misskey-js';
 import { compareVersions } from 'compare-versions';
@@ -41,6 +41,7 @@ export async function mainBoot() {
 		if (uiStyle === 'deck' && prefer.s['deck.useSimpleUiForNonRootPages'] && window.location.pathname !== '/') uiStyle = 'zen';
 
 		if (searchParams.has('ui')) uiStyle = searchParams.get('ui');
+		if (window.document.documentElement.dataset.campDesktopWindow === 'tool') uiStyle = 'visitor';
 
 		let rootComponent: Component;
 		switch (uiStyle) {
@@ -58,7 +59,7 @@ export async function mainBoot() {
 				break;
 		}
 
-		return createApp(rootComponent);
+		return rootComponent;
 	});
 
 	reactionPicker.init();
@@ -291,76 +292,55 @@ export async function mainBoot() {
 			});
 		}
 
-		if (store.s.realtimeMode) {
-			const stream = useStream();
+		const stream = useStream();
 
-			let reloadDialogShowing = false;
-			stream.on('_disconnected_', async () => {
-				if (prefer.s.serverDisconnectedBehavior === 'reload') {
-					window.location.reload();
-				} else if (prefer.s.serverDisconnectedBehavior === 'dialog') {
-					if (reloadDialogShowing) return;
-					reloadDialogShowing = true;
-					const { canceled } = await confirm({
-						type: 'warning',
-						title: i18n.ts.disconnectedFromServer,
-						text: i18n.ts.reloadConfirm,
-					});
-					reloadDialogShowing = false;
-					if (!canceled) {
-						window.location.reload();
-					}
-				}
+		stream.on('emojiAdded', emojiData => {
+			addCustomEmoji(emojiData.emoji);
+		});
+
+		stream.on('emojiUpdated', emojiData => {
+			updateCustomEmojis(emojiData.emojis);
+		});
+
+		stream.on('emojiDeleted', emojiData => {
+			removeCustomEmojis(emojiData.emojis);
+		});
+
+		stream.on('announcementCreated', onAnnouncementCreated);
+
+		const main = markRaw(stream.useChannel('main', null, 'System'));
+
+		// 自分の情報が更新されたとき
+		main.on('meUpdated', i => {
+			updateCurrentAccount(i);
+		});
+
+		main.on('readAllNotifications', () => {
+			updateCurrentAccount({
+				hasUnreadNotification: false,
+				unreadNotificationsCount: 0,
 			});
+		});
 
-			stream.on('emojiAdded', emojiData => {
-				addCustomEmoji(emojiData.emoji);
+		main.on('unreadNotification', () => {
+			const unreadNotificationsCount = ($i?.unreadNotificationsCount ?? 0) + 1;
+			updateCurrentAccount({
+				hasUnreadNotification: true,
+				unreadNotificationsCount,
 			});
+		});
 
-			stream.on('emojiUpdated', emojiData => {
-				updateCustomEmojis(emojiData.emojis);
-			});
+		main.on('newChatMessage', () => {
+			updateCurrentAccount({ hasUnreadChatMessages: true });
+			sound.playMisskeySfx('chatMessage');
+		});
 
-			stream.on('emojiDeleted', emojiData => {
-				removeCustomEmojis(emojiData.emojis);
-			});
+		main.on('readAllAnnouncements', () => {
+			updateCurrentAccount({ hasUnreadAnnouncement: false });
+		});
 
-			stream.on('announcementCreated', onAnnouncementCreated);
-
-			const main = markRaw(stream.useChannel('main', null, 'System'));
-
-			// 自分の情報が更新されたとき
-			main.on('meUpdated', i => {
-				updateCurrentAccount(i);
-			});
-
-			main.on('readAllNotifications', () => {
-				updateCurrentAccount({
-					hasUnreadNotification: false,
-					unreadNotificationsCount: 0,
-				});
-			});
-
-			main.on('unreadNotification', () => {
-				const unreadNotificationsCount = ($i?.unreadNotificationsCount ?? 0) + 1;
-				updateCurrentAccount({
-					hasUnreadNotification: true,
-					unreadNotificationsCount,
-				});
-			});
-
-			main.on('newChatMessage', () => {
-				updateCurrentAccount({ hasUnreadChatMessages: true });
-				sound.playMisskeySfx('chatMessage');
-			});
-
-			main.on('readAllAnnouncements', () => {
-				updateCurrentAccount({ hasUnreadAnnouncement: false });
-			});
-
-			// 個人宛てお知らせが発行されたとき
-			main.on('announcementCreated', onAnnouncementCreated);
-		}
+		// 個人宛てお知らせが発行されたとき
+		main.on('announcementCreated', onAnnouncementCreated);
 	}
 
 	// shortcut

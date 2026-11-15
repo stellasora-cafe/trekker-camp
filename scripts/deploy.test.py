@@ -19,8 +19,8 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
-CODE_REPO = "https://github.com/HePudding/trekker-camp.git"
-ASSETS_REPO = "https://github.com/HePudding/trekker-camp-assets.git"
+CODE_REPO = "https://github.com/stellasora-cafe/trekker-camp.git"
+ASSETS_REPO = "https://github.com/stellasora-cafe/trekker-camp-assets.git"
 CLOUDFLARE_TEST_TOKEN = "test-cloudflare-token".ljust(40, "x")
 GITHUB_TEST_PAT = "github_pat_test_read_only"
 
@@ -87,8 +87,63 @@ class DeployTests(unittest.TestCase):
         return self.shell('''
 github_token=fake-test-token
 auth_dir="$TEST_ROOT"
-sync_checkout "$TEST_ROOT/checkout" https://github.com/HePudding/trekker-camp.git
+sync_checkout "$TEST_ROOT/checkout" https://github.com/stellasora-cafe/trekker-camp.git
 ''', success=success)
+
+    def test_transferred_code_repository_accepts_existing_origin(self):
+        repo = self.repository("checkout", {"README.md": "Camp"})
+        self.git(repo, "remote", "add", "origin", "https://github.com/HePudding/trekker-camp.git")
+        self.shell('check_checkout "$TEST_ROOT/checkout" https://github.com/stellasora-cafe/trekker-camp.git')
+        self.git(repo, "remote", "set-url", "origin", "https://github.com/unrelated/trekker-camp.git")
+        self.shell('check_checkout "$TEST_ROOT/checkout" https://github.com/stellasora-cafe/trekker-camp.git', success=False)
+
+    def test_transferred_assets_repository_accepts_existing_origin(self):
+        repo = self.repository("checkout", {"README.md": "Camp assets"})
+        self.git(repo, "remote", "add", "origin", "https://github.com/HePudding/trekker-camp-assets.git")
+        self.shell('check_checkout "$TEST_ROOT/checkout" https://github.com/stellasora-cafe/trekker-camp-assets.git')
+
+    def test_transferred_assets_fetches_new_owner_and_preserves_saved_credentials(self):
+        source = self.repository("upstream", {"README.md": "first", ".gitignore": ".config/\n"})
+        checkout = self.root / "checkout"
+        subprocess.run(["git", "clone", str(source), str(checkout)], env=self.env, check=True, capture_output=True)
+        config = checkout / ".config"
+        config.mkdir()
+        token = config / "github-token"
+        token.write_text(GITHUB_TEST_PAT)
+        token.chmod(0o600)
+        (source / "README.md").write_text("updated")
+        self.git(source, "commit", "-am", "Update assets")
+        self.redirect(source, ASSETS_REPO)
+        for remote in (
+            "https://github.com/HePudding/trekker-camp-assets.git",
+            "git@github.com:HePudding/trekker-camp-assets.git",
+            "ssh://git@github.com/HePudding/trekker-camp-assets.git",
+            "git@github.com:stellasora-cafe/trekker-camp-assets.git",
+        ):
+            with self.subTest(remote=remote):
+                self.git(checkout, "remote", "set-url", "origin", remote)
+                self.shell('''
+github_token=$TEST_GITHUB_PAT
+auth_dir="$TEST_ROOT"
+sync_checkout "$TEST_ROOT/checkout" https://github.com/stellasora-cafe/trekker-camp-assets.git
+''')
+                self.assertEqual(self.git(checkout, "config", "--get", "remote.origin.url"), ASSETS_REPO)
+                self.assertEqual(self.git(checkout, "rev-parse", "HEAD"), self.git(source, "rev-parse", "HEAD"))
+                self.assertEqual(token.read_text(), GITHUB_TEST_PAT)
+                self.assertEqual(token.stat().st_mode & 0o777, 0o600)
+
+    def test_transferred_assets_failed_access_preserves_checkout_and_origin(self):
+        checkout = self.repository("checkout", {"README.md": "existing assets"})
+        remote = "https://github.com/HePudding/trekker-camp-assets.git"
+        self.git(checkout, "remote", "add", "origin", remote)
+        revision = self.git(checkout, "rev-parse", "HEAD")
+        self.shell('''
+github_git() { return 1; }
+sync_checkout "$TEST_ROOT/checkout" https://github.com/stellasora-cafe/trekker-camp-assets.git
+''', success=False)
+        self.assertEqual(self.git(checkout, "config", "--get", "remote.origin.url"), remote)
+        self.assertEqual(self.git(checkout, "rev-parse", "HEAD"), revision)
+        self.assertEqual((checkout / "README.md").read_text(), "existing assets")
 
     def test_supported_lts_and_architectures_select_matching_docker_source(self):
         for version, codename in (("22.04", "jammy"), ("24.04", "noble"), ("26.04", "resolute")):
@@ -186,6 +241,7 @@ detect_ubuntu() { :; }
 flock() { :; }
 docker() { :; }
 gh() { fail 'gh must not be used'; }
+prepare_release() { :; }
 sync_checkout() {
   [[ $github_token == "$TEST_GITHUB_PAT" ]]
   [[ $1 != "$assets_dir" || $TEST_AUTH_FAILURE != private-git ]]
@@ -252,10 +308,10 @@ main update --dir "$TEST_ROOT/checkout"
         self.shell('''
 github_token=fake-test-token
 auth_dir="$TEST_ROOT"
-sync_checkout "$TEST_ROOT/checkout" https://github.com/HePudding/trekker-camp-assets.git
+sync_checkout "$TEST_ROOT/checkout" https://github.com/stellasora-cafe/trekker-camp-assets.git
 git -C "$TEST_ROOT/checkout" lfs install --local --skip-smudge
 github_git -C "$TEST_ROOT/checkout" lfs pull --include='public/**' --exclude=
-check_checkout "$TEST_ROOT/checkout" https://github.com/HePudding/trekker-camp-assets.git
+check_checkout "$TEST_ROOT/checkout" https://github.com/stellasora-cafe/trekker-camp-assets.git
 ''')
         self.assertEqual((self.root / "checkout/public/image.bin").read_bytes(), b"fixture-binary-content\0")
         self.assertTrue((self.root / "checkout/originals/source.bin").read_text().startswith("version https://git-lfs"))
@@ -467,7 +523,7 @@ http://:8081 {
         self.shell("upgrade_maintenance_config", success=False)
         self.assertEqual(path.read_text(), custom)
 
-    def deployment(self, failure="", data_dir=None, action="update", legacy=False, setup_password=True):
+    def deployment(self, failure="", data_dir=None, action="update", legacy=False, setup_password=True, release=False):
         checkout = self.configuration(data_dir)
         if not setup_password:
             config = (data_dir or checkout) / ".config/default.yml"
@@ -481,12 +537,23 @@ http://:8081 {
         backup_root.mkdir()
         self.env["FAILURE"] = failure
         self.env["TEST_ACTION"] = action
+        self.env["TEST_RELEASE_DIR"] = ""
+        if release:
+            import json
+            (checkout / ".git").mkdir()
+            (checkout / "AGENTS.md").write_text("legacy source instructions")
+            candidate = checkout / ".releases/candidate"
+            candidate.mkdir(parents=True)
+            shutil.copy(ROOT / "compose.assets.yml", candidate)
+            (candidate / "RELEASE.json").write_text(json.dumps({"commit": "a" * 40}))
+            self.env["TEST_RELEASE_DIR"] = str(candidate)
         result = self.shell('''
 camp_dir="$TEST_ROOT/checkout"
 backup_dir=''
 compose() {
   printf '%s\n' "$*" >> "$TEST_ROOT/events"
-  case "$1:$FAILURE" in build:build|exec:backup) return 42 ;; esac
+  if [[ $* == 'config --no-env-resolution --format json' ]]; then printf '{"services":{}}'; return; fi
+  case "$1:$FAILURE" in build:build|pull:pull|exec:backup) return 42 ;; esac
   if [[ $* == *'web node --input-type=module' ]]; then
     cat > "$TEST_ROOT/runtime-check.mjs"
     if [[ $FAILURE == runtime ]]; then return 42; fi
@@ -499,22 +566,96 @@ compose() {
 }
 curl() {
   printf 'https %s\n' "$*" >> "$TEST_ROOT/events"
+  if [[ $FAILURE == final-https && $* == *'/healthz'* ]]; then return 42; fi
   [[ $FAILURE != https ]]
 }
 git() { printf '%040d\n' 1; }
 install_cli() {
   [[ ${4:-} == "$camp_dir" ]] || fail 'deployment directory must be saved with the CLI'
+  if [[ $TEST_ACTION == update ]]; then [[ -f $config_dir/maintenance/updating ]] || fail 'maintenance must cover CLI installation'; fi
   printf 'install-cli\n' >> "$TEST_ROOT/events"
 }
+release_source=$TEST_RELEASE_DIR
+if [[ $TEST_ACTION == update ]]; then begin_update_maintenance; fi
 deploy "$TEST_ACTION"
 ''', success=not failure)
         return checkout, (self.root / "events").read_text().splitlines(), result
+
+    def test_release_deployment_pulls_pinned_images_and_records_before_migration(self):
+        checkout, events, _ = self.deployment(release=True)
+        self.assertIn("pull web caddy", events)
+        self.assertFalse(any(event.startswith("build") for event in events))
+        self.assertLess(events.index("pull web caddy"), events.index("stop web"))
+        self.assertLess(events.index("stop --timeout 60 web"), events.index("pull web caddy"))
+        self.assertFalse((checkout / ".config/maintenance/updating").exists())
+        self.assertEqual((checkout / ".config/server-release").read_text().strip(), str(checkout / ".releases/candidate"))
+        self.assertFalse((checkout / ".git").exists())
+        self.assertFalse((checkout / "AGENTS.md").exists())
+        archived = next((self.root / "checkout.backups").glob("*/legacy-source/AGENTS.md"))
+        self.assertEqual(archived.read_text(), "legacy source instructions")
+        self.assertLess(events.index("install-cli"), events.index("config --no-env-resolution --format json"))
+
+    def test_legacy_checkout_archive_preserves_data_and_custom_mounts(self):
+        checkout = self.repository("checkout", {"AGENTS.md": "instructions", "apps/server.js": "source"})
+        for name in (".config/default.yml", ".releases/current/RELEASE.json", "compose.yml",
+                     "db/data", "redis/data", "files/upload", "private-assets/public/art",
+                     "caddy/cert", "backups/previous", "restic-cache/data", "custom-mounted/data",
+                     ".env", "runtime-env/custom.env", "node_modules/dependency.js", "operator-notes.txt"):
+            path = checkout / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(name)
+        (self.root / "backup").mkdir()
+        self.shell('''
+release_source="$camp_dir/.releases/current"
+backup_dir="$TEST_ROOT/backup"
+compose() { printf '{"services":{"web":{"env_file":[{"path":"%s/runtime-env/custom.env"}],"volumes":[{"type":"bind","source":"%s/custom-mounted"}]}}}' "$camp_dir" "$camp_dir"; }
+archive_legacy_checkout "$backup_dir"
+archive_legacy_checkout "$backup_dir"
+''')
+        archive = self.root / "backup/legacy-source"
+        for name in (".git", "AGENTS.md", "apps/server.js", "node_modules/dependency.js", "operator-notes.txt"):
+            self.assertTrue((archive / name).exists(), name)
+            self.assertFalse((checkout / name).exists(), name)
+        self.assertEqual(self.git(archive, "show", "HEAD:AGENTS.md"), "instructions")
+        for name in (".config/default.yml", ".releases/current/RELEASE.json", "compose.yml",
+                     "db/data", "redis/data", "files/upload", "private-assets/public/art",
+                     "caddy/cert", "backups/previous", "restic-cache/data", "custom-mounted/data", ".env", "runtime-env/custom.env"):
+            self.assertEqual((checkout / name).read_text(), name)
+
+    def test_legacy_checkout_archive_refuses_whole_checkout_bind(self):
+        checkout = self.repository("checkout", {"AGENTS.md": "instructions"})
+        (self.root / "backup").mkdir()
+        self.shell('''
+release_source="$camp_dir/.releases/current"
+backup_dir="$TEST_ROOT/backup"
+compose() { printf '{"services":{"web":{"volumes":[{"type":"bind","source":"%s"}]}}}' "$camp_dir"; }
+archive_legacy_checkout "$backup_dir"
+''', success=False)
+        self.assertTrue((checkout / ".git").is_dir())
+        self.assertTrue((checkout / "AGENTS.md").is_file())
+        self.assertFalse((self.root / "backup/legacy-source").exists())
+
+    def test_release_preflight_preserves_old_selection_and_migration_keeps_new_selection(self):
+        for failure in ("pull", "runtime", "migration", "health", "https"):
+            with self.subTest(failure=failure):
+                for path in (self.root / "checkout", self.root / "checkout.backups"):
+                    if path.exists():
+                        shutil.rmtree(path)
+                (self.root / "events").unlink(missing_ok=True)
+                checkout, events, _ = self.deployment(failure, release=True)
+                self.assertEqual((checkout / ".config/server-release").exists(), failure in ("migration", "health", "https"))
+                self.assertTrue((checkout / ".git").exists())
+                self.assertTrue((checkout / "AGENTS.md").exists())
+                self.assertTrue((checkout / ".config/maintenance/updating").exists())
+                if failure in ("pull", "runtime"):
+                    self.assertNotIn("stop web", events)
 
     def test_deployment_orders_build_backup_migration_and_health_checks(self):
         checkout, events, result = self.deployment(legacy=True)
         def index(prefix):
             return next(i for i, event in enumerate(events) if event.startswith(prefix))
         self.assertLess(index("build"), index("stop web"))
+        self.assertLess(index("stop --timeout 60 web"), index("build"))
         runtime = index("run --rm --no-deps -T --pull never --workdir")
         self.assertLess(index("build"), runtime)
         self.assertLess(runtime, index("up -d --wait --wait-timeout 120 db redis"))
@@ -549,7 +690,8 @@ deploy "$TEST_ACTION"
                 self.assertNotIn("install-cli", events)
                 if failure in ("build", "runtime", "proxy-config"):
                     self.assertNotIn("stop web", events)
-                    self.assertFalse(any(event.startswith("up ") for event in events))
+                    self.assertIn("stop --timeout 60 web", events)
+                    self.assertFalse(any(event.startswith("up ") and not event.endswith("caddy") for event in events))
                     self.assertFalse(list((self.root / "checkout.backups").iterdir()))
                 if failure in ("build", "proxy-config", "backup"):
                     self.assertFalse(any(event.startswith("run --rm --no-deps web") for event in events))
@@ -557,6 +699,60 @@ deploy "$TEST_ACTION"
                     self.assertFalse(any("--force-recreate" in event for event in events))
                 if failure == "health":
                     self.assertEqual(events[-1], "stop web")
+
+    def test_final_https_failure_reinstates_maintenance_and_stops_application(self):
+        checkout, events, _ = self.deployment("final-https", release=True)
+        self.assertTrue((checkout / ".config/maintenance/updating").exists())
+        self.assertIn("install-cli", events)
+        self.assertEqual(events[-1], "stop web")
+
+    def test_start_does_not_bypass_an_interrupted_update(self):
+        checkout = self.configuration()
+        (checkout / ".config/maintenance").mkdir()
+        (checkout / ".config/maintenance/updating").touch()
+        result = self.shell('''
+compose() { touch "$TEST_ROOT/should-not-run"; }
+start_site
+''', success=False)
+        self.assertIn("上次更新尚未完成", result.stderr)
+        self.assertFalse((self.root / "should-not-run").exists())
+
+    def test_update_disables_only_the_old_container_restart_policy(self):
+        checkout = self.configuration()
+        saved = (checkout / ".config/compose.autostart.yml").read_bytes()
+        self.shell('''
+compose() {
+  printf '%s\\n' "$*" >> "$TEST_ROOT/events"
+  if [[ $* == 'ps --all --quiet web' ]]; then printf 'old-web\\n'; fi
+}
+docker() { printf 'docker %s\\n' "$*" >> "$TEST_ROOT/events"; }
+begin_update_maintenance
+''')
+        events = (self.root / "events").read_text().splitlines()
+        self.assertLess(events.index("docker update --restart=no old-web"), events.index("stop --timeout 60 web"))
+        self.assertEqual((checkout / ".config/compose.autostart.yml").read_bytes(), saved)
+
+    @unittest.skipUnless(os.geteuid() == 0, "CLI entry point requires root")
+    def test_update_enters_maintenance_before_credentials_and_release_download(self):
+        checkout = self.configuration()
+        for failure in ("auth", "download"):
+            self.env["FAILURE"] = failure
+            (self.root / "events").unlink(missing_ok=True)
+            self.shell('''
+detect_ubuntu() { :; }
+flock() { :; }
+docker() { :; }
+compose() { printf '%s\\n' "$*" >> "$TEST_ROOT/events"; }
+prepare_auth() { echo auth >> "$TEST_ROOT/events"; [[ $FAILURE != auth ]]; }
+prepare_cloudflare() { :; }
+prepare_release() { echo download >> "$TEST_ROOT/events"; return 42; }
+main update --dir "$TEST_ROOT/checkout"
+''', success=False)
+            events = (self.root / "events").read_text().splitlines()
+            self.assertLess(events.index("stop --timeout 60 web"), events.index("auth"))
+            if failure == "download":
+                self.assertLess(events.index("auth"), events.index("download"))
+            self.assertTrue((checkout / ".config/maintenance/updating").exists())
 
     def test_invalid_maintenance_upgrade_restores_existing_proxy(self):
         checkout, events, _ = self.deployment("proxy-config", legacy=True)
@@ -1179,28 +1375,23 @@ main install --dir "$TEST_ROOT/new checkout" --url https://camp.stellasora.cafe
         self.assertFalse((self.root / "should-not-run").exists())
 
     @unittest.skipUnless(os.geteuid() == 0, "CLI entry point requires root")
-    def test_install_rejects_source_without_deployment_files_before_assets_or_configuration(self):
-        source = self.repository("source", {"README": "master without the deployment PR"})
-        self.redirect(source, CODE_REPO)
+    def test_install_rejects_missing_release_before_assets_or_configuration(self):
         self.env["GH_TOKEN"] = GITHUB_TEST_PAT
         self.env["CLOUDFLARE_API_TOKEN"] = CLOUDFLARE_TEST_TOKEN
         result = self.shell('''
-detect_ubuntu() { :; }
+ detect_ubuntu() { :; }
 flock() { :; }
 install_dependencies() { :; }
 systemctl() { :; }
 docker() { :; }
+download_release() { fail 'missing published release'; }
+sync_checkout() { touch "$TEST_ROOT/should-not-run"; }
 main install --dir "$TEST_ROOT/checkout" --url https://camp.example.com
 ''', success=False)
-        checkout = self.root / "checkout"
-        self.assertEqual(self.git(checkout, "rev-parse", "HEAD"), self.git(source, "rev-parse", "HEAD"))
-        self.assertIn("compose.vps.yml", result.stderr)
-        self.assertIn("master", result.stderr)
-        self.assertFalse((checkout / ".config").exists())
-        self.assertFalse((checkout / "compose.yml").exists())
-        self.assertFalse((checkout / "private-assets").exists())
-        self.assertNotIn(GITHUB_TEST_PAT, result.stdout + result.stderr)
-        self.assertNotIn(CLOUDFLARE_TEST_TOKEN, result.stdout + result.stderr)
+        self.assertIn("missing published release", result.stderr)
+        self.assertFalse((self.root / "should-not-run").exists())
+        self.assertFalse((self.root / "checkout/compose.yml").exists())
+        self.assertFalse((self.root / "checkout/private-assets").exists())
 
     def test_tui_failed_action_stops_child_and_keeps_menu_usable(self):
         command = self.menu_command('''
@@ -1384,23 +1575,16 @@ main --dir "$TEST_ROOT/checkout"
         return source
 
     def update_cli(self, success=True):
-        # Git resolves a real local remote; only the HTTPS file transport is replaced.
         return self.shell('''
-curl() {
-  local url='' output='' name revision
-  while (($#)); do
-    case "$1" in
-      https://*) url=$1; shift ;;
-      -o) output=$2; shift 2 ;;
-      *) shift ;;
-    esac
+download_release() {
+  local target=$1 revision
+  revision=$(command git -C "$TEST_CLI_SOURCE" rev-parse HEAD)
+  [[ $DOWNLOAD_FAILURE != backup.sh ]] || return 22
+  mkdir -p "$target/scripts"
+  for name in deploy.sh backup.sh; do
+    command git -C "$TEST_CLI_SOURCE" show "$revision:scripts/$name" > "$target/scripts/$name"
   done
-  printf '%s\n' "$url" >> "$TEST_ROOT/downloads"
-  name=${url##*/}
-  [[ $DOWNLOAD_FAILURE != "$name" ]] || return 22
-  revision=${url#https://raw.githubusercontent.com/HePudding/trekker-camp/}
-  revision=${revision%%/*}
-  command git -C "$TEST_CLI_SOURCE" show "$revision:scripts/$name" > "$output"
+  printf '{"commit":"%s"}' "$revision" > "$target/RELEASE.json"
 }
 docker() { fail 'CLI self-update must not contact Docker'; }
 self_update "$TEST_ROOT/prefix"
@@ -1494,7 +1678,6 @@ main status
         self.assertTrue(previous.is_dir())
         self.assertEqual((current / "VERSION").read_text(), revision + "\n")
         self.assertEqual((current / "backup.sh").read_bytes(), (source / "scripts/backup.sh").read_bytes())
-        self.assertTrue(all(f"/{revision}/scripts/" in url for url in (self.root / "downloads").read_text().splitlines()))
         result = subprocess.run([str(self.root / "prefix/bin/camp"), "version"], env=self.env, text=True, capture_output=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(revision, result.stdout)

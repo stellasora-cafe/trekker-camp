@@ -25,7 +25,12 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</div>
 	</div>
 	<div v-if="!(narrow && currentPage?.route.name == null)" class="main _pageContainer" style="height: 100%;">
-		<NestedRouterView/>
+		<PageWithHeader v-if="currentPage?.route.name === 'devices'">
+			<div class="_spacer" style="--MI_SPACER-w: 900px;">
+				<NestedRouterView/>
+			</div>
+		</PageWithHeader>
+		<NestedRouterView v-else/>
 	</div>
 </div>
 </template>
@@ -43,7 +48,7 @@ import * as os from '@/os.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import { lookupUser, lookupUserByEmail, lookupFile } from '@/utility/admin-lookup.js';
 import { definePage, provideMetadataReceiver, provideReactiveMetadata } from '@/page.js';
-import { useRouter } from '@/router.js';
+import { usePageBackRoot, useRouter } from '@/router.js';
 import { genSearchIndexes } from '@/utility/inapp-search.js';
 
 const searchIndex = await import('search-index:admin').then(({ searchIndexes }) => genSearchIndexes(searchIndexes));
@@ -63,6 +68,7 @@ provide('shouldOmitHeaderTitle', false);
 const INFO = ref<PageMetadata>(indexInfo);
 const childInfo = ref<null | PageMetadata>(null);
 const narrow = ref(false);
+usePageBackRoot(router, '/admin/overview', computed(() => !narrow.value));
 const view = ref(null);
 const el = ref<HTMLDivElement | null>(null);
 const pageProps = ref({});

@@ -4,10 +4,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<div v-if="instance" :class="$style.root">
+<div v-if="instance" :class="[$style.root, { [$style.compact]: compact }]">
 	<div :class="[$style.main, $style.panel]">
-		<img :src="instance.iconUrl || '/favicon.ico'" alt="" :class="$style.mainIcon"/>
-		<button class="_button _acrylic" :class="$style.mainMenu" @click="showMenu"><i class="ti ti-dots"></i></button>
+		<img :src="iconFailed ? '/favicon.ico' : (instance.iconUrl || '/favicon.ico')" alt="" :class="$style.mainIcon" @error="iconFailed = true"/>
+		<button type="button" class="_button _acrylic" :class="$style.mainMenu" :aria-label="i18n.ts.menu" @click="showMenu"><i class="ti ti-dots"></i></button>
 		<div :class="$style.mainFg">
 			<h1 :class="$style.mainTitle">
 				<!-- 背景色によってはロゴが見えなくなるのでとりあえず無効に -->
@@ -22,13 +22,13 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<MkInfo v-if="instance.disableRegistration" warn>{{ i18n.ts.invitationRequiredToRegister }}</MkInfo>
 			</div>
 			<div class="_gaps_s" :class="$style.mainActions">
-				<MkButton :class="$style.mainAction" full rounded gradate data-testid="signup" style="margin-right: 12px;" @click="signup()">{{ i18n.ts.joinThisServer }}</MkButton>
-				<MkButton :class="$style.mainAction" full rounded type="a" target="_blank" rel="noopener" href="https://misskey-hub.net/servers/">{{ i18n.ts.exploreOtherServers }}</MkButton>
+				<MkButton :class="$style.mainAction" full rounded gradate data-testid="signup" @click="signup()">{{ i18n.ts.joinThisServer }}</MkButton>
 				<MkButton :class="$style.mainAction" full rounded data-testid="signin" @click="signin()">{{ i18n.ts.login }}</MkButton>
 			</div>
 		</div>
 	</div>
-	<div v-if="stats && instance.clientOptions.showActivitiesForVisitor !== false" :class="$style.stats">
+	<MkButton v-if="compact" :class="$style.toolbox" full rounded disabled>{{ i18n.ts._desktop.toolboxComingSoon }}</MkButton>
+	<div v-if="!compact && stats && instance.clientOptions.showActivitiesForVisitor !== false" :class="$style.stats">
 		<div :class="[$style.statsItem, $style.panel]">
 			<div :class="$style.statsItemLabel">{{ i18n.ts.users }}</div>
 			<div :class="$style.statsItemCount"><MkNumber :value="stats.originalUsersCount"/></div>
@@ -38,13 +38,13 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<div :class="$style.statsItemCount"><MkNumber :value="stats.originalNotesCount"/></div>
 		</div>
 	</div>
-	<div v-if="instance.policies.ltlAvailable && instance.clientOptions.showTimelineForVisitor !== false" :class="[$style.tl, $style.panel]">
+	<div v-if="!compact && instance.policies.ltlAvailable && instance.clientOptions.showTimelineForVisitor !== false" :class="[$style.tl, $style.panel]">
 		<div :class="$style.tlHeader">{{ i18n.ts.letsLookAtTimeline }}</div>
 		<div :class="$style.tlBody">
 			<MkStreamingNotesTimeline src="local"/>
 		</div>
 	</div>
-	<div v-if="instance.clientOptions.showActivitiesForVisitor !== false" :class="$style.panel">
+	<div v-if="!compact && instance.clientOptions.showActivitiesForVisitor !== false" :class="$style.panel">
 		<XActiveUsersChart/>
 	</div>
 </div>
@@ -66,9 +66,16 @@ import { openInstanceMenu } from '@/ui/_common_/common.js';
 
 const XActiveUsersChart = defineAsyncComponent(() => import('@/components/MkVisitorDashboard.ActiveUsersChart.vue'));
 
-const stats = ref<Misskey.entities.StatsResponse | null>(null);
+const props = withDefaults(defineProps<{
+	compact?: boolean;
+}>(), {
+	compact: false,
+});
 
-if (instance.clientOptions.showActivitiesForVisitor !== false) {
+const stats = ref<Misskey.Endpoints['stats']['res'] | null>(null);
+const iconFailed = ref(false);
+
+if (!props.compact && instance.clientOptions.showActivitiesForVisitor !== false) {
 	misskeyApi('stats', {}).then((res) => {
 		stats.value = res;
 	});
@@ -165,6 +172,29 @@ function showMenu(ev: PointerEvent) {
 
 .mainAction {
 	line-height: 28px;
+}
+
+.compact {
+	width: 100%;
+	max-width: 472px;
+	margin: 0 auto;
+
+	.mainTitle {
+		padding-bottom: 20px;
+	}
+
+	.mainAbout {
+		padding: 0 24px;
+	}
+
+	.mainActions {
+		padding: 28px 24px;
+	}
+}
+
+.toolbox {
+	min-height: 46px;
+	font-size: 0.9em;
 }
 
 .stats {

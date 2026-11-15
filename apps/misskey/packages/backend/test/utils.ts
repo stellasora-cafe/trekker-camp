@@ -20,6 +20,7 @@ import type * as misskey from 'misskey-js';
 import { DEFAULT_POLICIES } from '@/core/RoleService.js';
 import { validateContentTypeSetAsActivityPub } from '@/core/activitypub/misc/validator.js';
 import { IdService } from '@/core/IdService.js';
+import { MiUser } from '@/models/User.js';
 import { MiRegistrationTicket } from '@/models/RegistrationTicket.js';
 import { verificationCode } from './misc/verification-code.js';
 import { ApiError } from '@/server/api/error.js';
@@ -94,8 +95,10 @@ export const api = async <E extends keyof misskey.Endpoints, P extends misskey.E
 	body: misskey.api.SwitchCaseResponseType<E, P>
 }> => {
 	const bodyAuth: Record<string, string> = {};
+	const credential = me?.token ?? (params as { i?: string }).i;
 	const headers: Record<string, string> = {
 		'Content-Type': 'application/json',
+		'X-Camp-Client': credential && credential.length !== 16 && !credential.startsWith('cs_') ? 'third-party-v1' : 'web-v1',
 	};
 
 	if (me?.bearer) {
@@ -167,6 +170,16 @@ export async function signupParameters(params?: Partial<misskey.Endpoints['signu
 export const signup = async (params?: Partial<misskey.Endpoints['signup']['req']>): Promise<NonNullable<misskey.Endpoints['signup']['res']>> => {
 	const res = await api('signup', await signupParameters(params));
 	assert.strictEqual(res.status, 200, inspect(res.body));
+	if (params?.host) {
+		// Archived remote fixtures use legacy credentials; client sessions are local-only.
+		const db = await initTestDb(true);
+		try {
+			const user = await db.getRepository(MiUser).findOneByOrFail({ id: res.body.id });
+			return { ...res.body, token: user.token! };
+		} finally {
+			await db.destroy();
+		}
+	}
 	return res.body;
 };
 
@@ -349,7 +362,7 @@ export const uploadFile = async (user?: UserToken, { path, name, blob }: UploadO
 		formData.append('name', name);
 	}
 
-	const headers: Record<string, string> = {};
+	const headers: Record<string, string> = { 'X-Camp-Client': user && user.token.length !== 16 && !user.token.startsWith('cs_') ? 'third-party-v1' : 'web-v1' };
 	if (user?.bearer) {
 		headers.Authorization = `Bearer ${user.token}`;
 	} else if (user) {
@@ -394,6 +407,7 @@ export function connectStream<C extends keyof misskey.Channels>(user: UserToken 
 	return new Promise((res, rej) => {
 		const url = new URL(`ws://127.0.0.1:${port}/streaming`);
 		const options: ClientOptions = {};
+		url.searchParams.set('client', user && user.token.length !== 16 && !user.token.startsWith('cs_') ? 'third-party-v1' : 'web-v1');
 		if (user?.bearer) {
 			options.headers = { Authorization: `Bearer ${user.token}` };
 		} else if (user) {
@@ -466,14 +480,14 @@ export function makeStreamCatcher<T>(
 	extractor: (message: Record<string, any>) => T,
 	timeout = 60 * 1000): Promise<T> {
 	let ws: WebSocket;
-	const p = new Promise<T>(async (resolve) => {
-		ws = await connectStream(user, channel, (msg) => {
+	const p = new Promise<T>((resolve, reject) => {
+		connectStream(user, channel, (msg) => {
 			if (cond(msg)) {
 				resolve(extractor(msg));
 			}
-		});
+		}).then(connection => { ws = connection; }, reject);
 	}).finally(() => {
-		ws.close();
+		ws?.close();
 	});
 
 	return timeoutPromise(p, timeout);
@@ -676,7 +690,7 @@ export async function captureWebhook<T = SystemWebhookPayload>(postAction: () =>
 	const fastify = Fastify();
 
 	let timeoutHandle: NodeJS.Timeout | null = null;
-	const result = await new Promise<string>(async (resolve, reject) => {
+	const result = await new Promise<string>((resolve, reject) => {
 		fastify.all('/', async (req, res) => {
 			if (timeoutHandle) {
 				clearTimeout(timeoutHandle);
@@ -688,19 +702,19 @@ export async function captureWebhook<T = SystemWebhookPayload>(postAction: () =>
 			resolve(body);
 		});
 
-		await fastify.listen({ port });
+		fastify.listen({ port }).then(async () => {
+			timeoutHandle = setTimeout(async () => {
+				await fastify.close();
+				reject(new Error('timeout'));
+			}, 3000);
 
-		timeoutHandle = setTimeout(async () => {
-			await fastify.close();
-			reject(new Error('timeout'));
-		}, 3000);
-
-		try {
-			await postAction();
-		} catch (e) {
-			await fastify.close();
-			reject(e);
-		}
+			try {
+				await postAction();
+			} catch (e) {
+				await fastify.close();
+				reject(e);
+			}
+		}, reject);
 	});
 
 	await fastify.close();

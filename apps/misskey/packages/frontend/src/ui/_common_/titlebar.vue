@@ -11,7 +11,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	</div>
 	<div :class="$style.controls">
 		<span :class="$style.left">
-			<button v-if="canBack" class="_button" :class="$style.button" @click="goBack"><i class="ti ti-arrow-left"></i></button>
+			<button v-if="canBack" type="button" class="_button" :class="$style.button" :aria-label="i18n.ts.goBack" @click="goBack(router)"><i class="ti ti-arrow-left"></i></button>
 		</span>
 		<span :class="$style.right">
 		</span>
@@ -21,15 +21,13 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <script lang="ts" setup>
 import { host } from '@@/js/config.js';
-import { ref } from 'vue';
+import { computed } from 'vue';
 import { instance } from '@/instance.js';
-import { prefer } from '@/preferences.js';
+import { i18n } from '@/i18n.js';
+import { goBack, useRouter, getRouterPageBackState } from '@/router.js';
 
-const canBack = ref(true);
-
-function goBack() {
-	window.history.back();
-}
+const router = useRouter();
+const canBack = computed(() => getRouterPageBackState(router).visible);
 </script>
 
 <style lang="scss" module>

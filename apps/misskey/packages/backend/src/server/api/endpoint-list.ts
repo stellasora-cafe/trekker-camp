@@ -361,6 +361,7 @@ export * as 'pages/show' from './endpoints/pages/show.js';
 export * as 'pages/unlike' from './endpoints/pages/unlike.js';
 export * as 'pages/update' from './endpoints/pages/update.js';
 export * as 'ping' from './endpoints/ping.js';
+export * as 'client-resources' from './endpoints/client-resources.js';
 export * as 'pinned-users' from './endpoints/pinned-users.js';
 export * as 'promo/read' from './endpoints/promo/read.js';
 export * as 'renote-mute/create' from './endpoints/renote-mute/create.js';
@@ -454,3 +455,10 @@ export * as 'auth/begin-password-reset' from './endpoints/auth/begin-password-re
 export * as 'i/update-phone' from './endpoints/i/update-phone.js';
 export * as 'admin/verification-settings' from './endpoints/admin/verification-settings.js';
 export * as 'admin/update-verification-settings' from './endpoints/admin/update-verification-settings.js';
+export * as 'i/client-sessions' from './endpoints/i/client-sessions.js';
+export * as 'i/revoke-client-session' from './endpoints/i/revoke-client-session.js';
+export * as 'i/upgrade-client-session' from './endpoints/i/upgrade-client-session.js';
+export * as 'client-auth/start' from './endpoints/client-auth/start.js';
+export * as 'client-auth/check' from './endpoints/client-auth/check.js';
+export * as 'client-auth/show' from './endpoints/client-auth/show.js';
+export * as 'client-auth/approve' from './endpoints/client-auth/approve.js';

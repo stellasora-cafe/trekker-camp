@@ -34,6 +34,7 @@ import { pleaseLogin } from '@/utility/please-login.js';
 import { showMovedDialog } from '@/utility/show-moved-dialog.js';
 import { getHTMLElementOrNull } from '@/utility/get-dom-node-or-null.js';
 import { focusParent } from '@/utility/focus.js';
+import { hasDesktopWindowChrome } from '@/utility/desktop-window.js';
 
 export const openingWindowsCount = ref(0);
 
@@ -510,7 +511,10 @@ export function success(): Promise<void> {
 }
 
 export function waiting(options: { text?: string } = {}) {
-	window.document.body.setAttribute('inert', 'true');
+	// MkWaitingDialog's focus trap manages desktop content without disabling the
+	// window controls or restoring stale inert state from another closing modal.
+	const blockBody = !hasDesktopWindowChrome();
+	if (blockBody) window.document.body.setAttribute('inert', 'true');
 
 	const showing = ref(true);
 	const isSuccess = ref(false);
@@ -533,7 +537,7 @@ export function waiting(options: { text?: string } = {}) {
 		text: options.text,
 	}, {
 		closed: () => {
-			window.document.body.removeAttribute('inert');
+			if (blockBody) window.document.body.removeAttribute('inert');
 			dispose();
 		},
 	});

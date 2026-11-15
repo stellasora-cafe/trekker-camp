@@ -16,6 +16,7 @@ import { prefer } from '@/preferences.js';
 import { store } from '@/store.js';
 import { $i } from '@/i.js';
 import { signout } from '@/signout.js';
+import { isDesktopClient, offline } from '@/utility/offline.js';
 
 type AccountWithToken = Misskey.entities.MeDetailed & { token: string };
 
@@ -61,13 +62,19 @@ const isAccountDeleted = Symbol('isAccountDeleted');
 
 function fetchAccount(token: string, id?: string, forceShowDialog?: boolean): Promise<Misskey.entities.MeDetailed> {
 	return new Promise((done, fail) => {
+		if (isDesktopClient() && offline.value) {
+			fail(new TypeError('Network unavailable'));
+			return;
+		}
 		window.fetch(`${apiUrl}/i`, {
 			method: 'POST',
 			body: JSON.stringify({
 				i: token,
 			}),
+			signal: isDesktopClient() ? AbortSignal.timeout(5000) : undefined,
 			headers: {
 				'Content-Type': 'application/json',
+			'X-Camp-Client': 'web-v1',
 			},
 		})
 			.then(res => new Promise<Misskey.entities.MeDetailed | { error: Record<string, any> }>((done2, fail2) => {

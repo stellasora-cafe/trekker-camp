@@ -157,6 +157,7 @@ export default class Connection {
 		const { type, body } = obj;
 
 		switch (type) {
+			case 'ping': this.sendMessageToWs('pong', {}); break;
 			case 'readNotification': this.onReadNotification(body); break;
 			case 'subNote': this.onSubscribeNote(body); break;
 			case 's': this.onSubscribeNote(body); break; // alias

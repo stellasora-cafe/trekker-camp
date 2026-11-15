@@ -58,7 +58,8 @@ export interface IPaginator<T = unknown, _T = T & MisskeyEntity> {
 	init(): Promise<void>;
 	reload(): Promise<void>;
 	fetchOlder(): Promise<void>;
-	fetchNewer(options?: { toQueue?: boolean }): Promise<void>;
+	fetchNewer(options?: { toQueue?: boolean; sinceId?: string | null; catchUp?: boolean }): Promise<void>;
+	getNewestId(): string | null | undefined;
 	trim(trigger?: boolean): void;
 	unshiftItems(newItems: (_T)[]): void;
 	pushItems(oldItems: (_T)[]): void;
@@ -106,6 +107,7 @@ export class Paginator<
 	private searchParamName: keyof E['req'] | 'search';
 	private canFetchDetection: 'safe' | 'limit' | null = null;
 	private aheadQueue: T[] = [];
+	private generation = 0;
 	private useShallowRef: SRef;
 
 	// 配列内の要素をどのような順序で並べるか
@@ -177,7 +179,7 @@ export class Paginator<
 		this.updateItem = this.updateItem.bind(this);
 	}
 
-	private getNewestId(): string | null | undefined {
+	public getNewestId(): string | null | undefined {
 		// 様々な要因により並び順は保証されないのでソートが必要
 		if (this.aheadQueue.length > 0) {
 			return this.aheadQueue.map(x => x.id).sort().at(-1);
@@ -191,6 +193,8 @@ export class Paginator<
 	}
 
 	public async init(): Promise<void> {
+		this.generation++;
+		this.fetchingNewer.value = false;
 		this.items.value = [];
 		this.aheadQueue = [];
 		this.queuedAheadItemsCount.value = 0;
@@ -311,8 +315,13 @@ export class Paginator<
 
 	public async fetchNewer(options: {
 		toQueue?: boolean;
+		sinceId?: string | null;
+		catchUp?: boolean;
 	} = {}): Promise<void> {
+		if (this.fetchingNewer.value) return;
+		const generation = this.generation;
 		this.fetchingNewer.value = true;
+		const sinceId = options.sinceId === undefined ? this.getNewestId() : options.sinceId;
 
 		const data: E['req'] = {
 			...(typeof this.params === 'function' ? this.params() : this.params),
@@ -322,7 +331,7 @@ export class Paginator<
 			...(this.offsetMode ? {
 				offset: this.items.value.length,
 			} : {
-				sinceId: this.getNewestId(),
+				sinceId,
 			}),
 		};
 
@@ -330,6 +339,7 @@ export class Paginator<
 			return null;
 		})) as T[] | null;
 
+		if (generation !== this.generation) return;
 		this.fetchingNewer.value = false;
 
 		if (apiRes == null || apiRes.length === 0) {
@@ -339,11 +349,18 @@ export class Paginator<
 		}
 
 		if (options.toQueue) {
-			this.aheadQueue.unshift(...apiRes.toReversed());
+			const existing = new Set([...this.items.value, ...this.aheadQueue].map(item => item.id));
+			this.aheadQueue.push(...apiRes.filter(item => !existing.has(item.id)));
+			this.aheadQueue.sort((a, b) => a.id > b.id ? -1 : a.id < b.id ? 1 : 0);
 			if (this.aheadQueue.length > MAX_QUEUE_ITEMS) {
 				this.aheadQueue = this.aheadQueue.slice(0, MAX_QUEUE_ITEMS);
 			}
 			this.queuedAheadItemsCount.value = this.aheadQueue.length;
+		} else if (options.catchUp) {
+			const existing = new Set(this.items.value.map(item => item.id));
+			const merged = [...this.items.value, ...apiRes.filter(item => !existing.has(item.id))];
+			const direction = this.order.value === 'oldest' ? 1 : -1;
+			this.items.value = merged.sort((a, b) => a.id > b.id ? direction : a.id < b.id ? -direction : 0);
 		} else {
 			if (this.order.value === 'oldest') {
 				this.pushItems(apiRes);
@@ -357,6 +374,12 @@ export class Paginator<
 				this.canFetchNewer.value = false;
 			} else {
 				this.canFetchNewer.value = true;
+			}
+		}
+		if (options.catchUp && !this.offsetMode) {
+			const newestId = apiRes.map(item => item.id).sort().at(-1)!;
+			if (sinceId == null || newestId > sinceId) {
+				await this.fetchNewer({ ...options, sinceId: newestId });
 			}
 		}
 		// canFetchDetectionが'safe'の場合・apiRes.length === 0 の場合は apiRes.length === 0 の場合に canFetchNewer.value = false になるが、
@@ -390,6 +413,7 @@ export class Paginator<
 	}
 
 	public enqueue(item: T): void {
+		if (this.items.value.some(x => x.id === item.id) || this.aheadQueue.some(x => x.id === item.id)) return;
 		this.aheadQueue.unshift(item);
 		if (this.aheadQueue.length > MAX_QUEUE_ITEMS) {
 			this.aheadQueue.pop();
@@ -405,7 +429,8 @@ export class Paginator<
 	}
 
 	public removeItem(id: string): void {
-		// TODO: queueからも消す
+		this.aheadQueue = this.aheadQueue.filter(item => item.id !== id);
+		this.queuedAheadItemsCount.value = this.aheadQueue.length;
 
 		const index = this.items.value.findIndex(x => x.id === id);
 		if (index !== -1) {
@@ -415,7 +440,7 @@ export class Paginator<
 	}
 
 	public updateItem(id: string, updater: (item: T) => T): void {
-		// TODO: queueのも更新
+		this.aheadQueue = this.aheadQueue.map(item => item.id === id ? updater(item) : item);
 
 		const index = this.items.value.findIndex(x => x.id === id);
 		if (index !== -1) {

@@ -10,6 +10,13 @@ const ignoreElements = [
 	'style',
 ];
 
+function ignoresTrap(el: HTMLElement): boolean {
+	return ignoreElements.includes(el.tagName.toLowerCase()) || (
+		window.document.documentElement.dataset.campWindowChrome === 'true' &&
+		el.hasAttribute('data-camp-window-titlebar')
+	);
+}
+
 function containsFocusTrappedElements(el: HTMLElement): boolean {
 	return Array.from(focusTrapElements).some((focusTrapElement) => {
 		return el.contains(focusTrapElement);
@@ -42,7 +49,7 @@ function getHighestZIndexElement(): { el: HTMLElement; zIndex: number; } | null 
 	};
 }
 
-function releaseFocusTrap(el: HTMLElement): void {
+function releaseFocusTrap(el: HTMLElement, parent = false): void {
 	focusTrapElements.delete(el);
 	if (el.inert === true) {
 		el.inert = false;
@@ -67,15 +74,19 @@ function releaseFocusTrap(el: HTMLElement): void {
 				highestZIndexElement != null &&
 				siblingEl !== highestZIndexElement.el &&
 				!siblingEl.contains(highestZIndexElement.el) &&
-				!ignoreElements.includes(siblingEl.tagName.toLowerCase())
+				!ignoresTrap(siblingEl)
 			) {
 				siblingEl.inert = true;
 			} else {
 				siblingEl.inert = false;
 			}
 		});
-		releaseFocusTrap(el.parentElement);
+		releaseFocusTrap(el.parentElement, true);
 	}
+
+	// A higher overlay can leave a nested, still-open modal inert. Restore its
+	// complete ancestor path once the released overlay's path has been reset.
+	if (!parent && highestZIndexElement != null) focusTrap(highestZIndexElement.el);
 }
 
 export function focusTrap(el: HTMLElement, hasInteractionWithOtherFocusTrappedEls: boolean, parent: true): void;
@@ -114,7 +125,7 @@ export function focusTrap(el: HTMLElement, hasInteractionWithOtherFocusTrappedEl
 					hasInteractionWithOtherFocusTrappedEls === false ||
 					(!focusTrapElements.has(siblingEl) && !containsFocusTrappedElements(siblingEl))
 				) &&
-				!ignoreElements.includes(siblingEl.tagName.toLowerCase())
+				!ignoresTrap(siblingEl)
 			) {
 				siblingEl.inert = true;
 			}

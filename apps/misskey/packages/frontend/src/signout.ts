@@ -11,14 +11,28 @@ import { unisonReload } from '@/utility/unison-reload.js';
 import { clear } from '@/utility/idb-proxy.js';
 import { $i } from '@/i.js';
 import { encodePushSubscriptionKey } from '@/utility/encode-push-subscription-key.js';
+import { misskeyApi } from '@/utility/misskey-api.js';
 
-export async function signout() {
+let signingOut: Promise<void> | null = null;
+
+export function signout(options: { revoked?: boolean } = {}) {
+	return signingOut ??= performSignout(options);
+}
+
+async function performSignout(options: { revoked?: boolean }) {
 	if (!$i) return;
 
 	waiting();
 
-	if (store.s.enablePreferencesAutoCloudBackup) {
+	if (!options.revoked && store.s.enablePreferencesAutoCloudBackup) {
 		await cloudBackup();
+	}
+	if (!options.revoked && $i.token.startsWith('cs_')) {
+		try {
+			const sessions = await misskeyApi('i/client-sessions');
+			const current = sessions.find(session => session.isCurrent);
+			if (current) await misskeyApi('i/revoke-client-session', { sessionId: current.id });
+		} catch { /* Local signout is still available while offline. */ }
 	}
 
 	localStorage.clear();
@@ -64,6 +78,7 @@ export async function signout() {
 					}),
 					headers: {
 						'Content-Type': 'application/json',
+					'X-Camp-Client': 'web-v1',
 					},
 				});
 			}

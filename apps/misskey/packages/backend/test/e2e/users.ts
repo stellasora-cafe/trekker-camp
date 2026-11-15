@@ -305,7 +305,7 @@ describe('ユーザー', () => {
 		}) as unknown as misskey.entities.SignupResponse; // BUG MeDetailedに足りないキーがある
 
 		// signupの時はtokenが含まれる特別なMeDetailedが返ってくる
-		assert.match(response.token, /[a-zA-Z0-9]{16}/);
+		assert.match(response.token, /^cs_[A-Za-z0-9_-]{43}$/);
 
 		// UserLite
 		assert.match(response.id, /[0-9a-z]{10}/);

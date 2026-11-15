@@ -58,6 +58,9 @@ import { parseThemeCode } from '@@/js/theme-code.js';
 import { unisonReload } from '@/utility/unison-reload.js';
 import { i18n } from '@/i18n.js';
 import { definePage } from '@/page.js';
+import { goBack, useRouter } from '@/router.js';
+
+const router = useRouter();
 
 const uiPhase = ref<'fetching' | 'confirm' | 'error'>('fetching');
 const errorKV = ref<{
@@ -74,11 +77,7 @@ const hash = ref<string | null>(null);
 const data = ref<Extension | null>(null);
 
 function close_(): void {
-	if (window.history.length === 1) {
-		window.close();
-	} else {
-		window.history.back();
-	}
+	goBack(router);
 }
 
 async function _fetch_() {

@@ -10,7 +10,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<component :is="currentPageComponent" :key="key" v-bind="Object.fromEntries(currentPageProps)"/>
 
 			<template #fallback>
-				<MkLoading/>
+				<MkLoadingPage/>
 			</template>
 		</Suspense>
 	</KeepAlive>
@@ -37,11 +37,12 @@ if (_router == null) {
 }
 
 const router = _router;
+provide(DI.router, router);
 
 const viewId = randomId();
 provide(DI.viewId, viewId);
 
-const currentDepth = inject(DI.routerCurrentDepth, 0);
+const currentDepth = props.router != null ? 0 : inject(DI.routerCurrentDepth, 0);
 provide(DI.routerCurrentDepth, currentDepth + 1);
 
 const current = router.current;

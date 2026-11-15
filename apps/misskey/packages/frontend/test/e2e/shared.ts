@@ -73,6 +73,7 @@ export async function api(baseUrl: string, endpoint: string, body: Record<string
 		body: JSON.stringify(body),
 		headers: {
 			'Content-Type': 'application/json',
+			'X-Camp-Client': 'web-v1',
 		},
 	});
 	assertOk(response.status, `/api/${endpoint}`);

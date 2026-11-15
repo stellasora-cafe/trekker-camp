@@ -61,14 +61,14 @@ jobs:
       postgres:
         image: postgres:18
         ports:
-          - 54312:5432
+          - 5432/tcp
         env:
           POSTGRES_DB: test-misskey
           POSTGRES_HOST_AUTH_METHOD: trust
       redis:
         image: redis:8
         ports:
-          - 56312:6379
+          - 6379/tcp
 
     steps:
     - uses: actions/checkout@v7.0.1
@@ -83,14 +83,20 @@ jobs:
         cache: 'pnpm'
     - run: pnpm i --frozen-lockfile
     - name: Copy Configure
-      run: cp .github/misskey/test.yml .config
+      env:
+        POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
+        REDIS_PORT: ${{ job.services.redis.ports[6379] }}
+      run: |
+        sed -e "s/port: 54312/port: ${POSTGRES_PORT}/" \
+            -e "s/port: 56312/port: ${REDIS_PORT}/" \
+            .github/misskey/test.yml > .config/test.yml
     - name: Build
       run: pnpm build
     - name: Playwright install
       working-directory: apps/misskey/packages/frontend
       run: pnpm exec playwright install --with-deps chromium
     - name: Test
-      run: pnpm start-server-and-test start:test http://localhost:61812 "pnpm --filter frontend test:e2e"
+      run: pnpm start-server-and-test "pnpm --filter backend start:test" http://localhost:61812 "pnpm --filter frontend test:e2e"
       timeout-minutes: 15
     - uses: actions/upload-artifact@v7
       if: failure()

@@ -41,8 +41,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<XTotp
 			v-else-if="page === 'totp'"
 			key="totp"
+			:canUsePasskey="credentialRequest !== null"
 
 			@totpSubmitted="onTotpSubmitted"
+			@usePasskey="onUsePasskey"
 		/>
 
 		<!-- 4. パスキー -->
@@ -55,8 +57,12 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 			@done="onPasskeyDone"
 			@useTotp="onUseTotp"
+			@retry="onUsePasskey"
 		/>
 	</Transition>
+	<MkButton v-if="desktop" :class="$style.updateButton" :disabled="waiting" small transparent @click="checkDesktopUpdates">
+		<i class="ti ti-refresh"></i> {{ i18n.ts._desktop.checkUpdates }}
+	</MkButton>
 	<div v-if="waiting" :class="$style.waitingRoot">
 		<MkLoading/>
 	</div>
@@ -80,6 +86,10 @@ import XPassword from '@/components/MkSignin.password.vue';
 import XTotp from '@/components/MkSignin.totp.vue';
 import XPasskey from '@/components/MkSignin.passkey.vue';
 import { login } from '@/accounts.js';
+import MkButton from '@/components/MkButton.vue';
+import { checkDesktopUpdates, desktopWindowMode } from '@/utility/desktop-window.js';
+
+const desktop = desktopWindowMode() !== 'browser';
 
 const emit = defineEmits<{
 	(ev: 'login', v: Misskey.entities.SigninFlowResponse & { finished: true }): void;
@@ -99,6 +109,8 @@ const props = withDefaults(defineProps<{
 
 const page = ref<'input' | 'password' | 'totp' | 'passkey'>('input');
 const waiting = ref(false);
+const requestController = new AbortController();
+let active = true;
 
 const passwordPageEl = useTemplateRef('passwordPageEl');
 const needCaptcha = ref(false);
@@ -109,27 +121,38 @@ const password = ref('');
 const credentialRequest = shallowRef<PublicKeyCredentialRequestOptionsJSON | null>(null);
 
 function onPasskeyDone(credential: AuthenticationResponseJSON): void {
+	if (!active || waiting.value || userInfo.value == null) return;
 	waiting.value = true;
 
-	if (userInfo.value != null) {
-		tryLogin({
-			username: userInfo.value.username,
-			password: password.value,
-			credential: credential,
-		});
-	}
+	void tryLogin({
+		username: userInfo.value.username,
+		password: password.value,
+		credential: credential,
+	});
 }
 
 function onUseTotp(): void {
 	page.value = 'totp';
 }
 
+async function onUsePasskey(): Promise<void> {
+	if (!active || waiting.value || userInfo.value == null || credentialRequest.value == null) return;
+	waiting.value = true;
+	await tryLogin({
+		username: userInfo.value.username,
+		password: password.value,
+	});
+}
+
 async function onUsernameSubmitted(username: string) {
+	if (!active || waiting.value) return;
 	waiting.value = true;
 
-	userInfo.value = await misskeyApi('users/show', {
+	const user = await misskeyApi('users/show', {
 		username,
-	}).catch(() => null);
+	}, undefined, requestController.signal).catch(() => null);
+	if (!active) return;
+	userInfo.value = user;
 
 	await tryLogin({
 		username,
@@ -182,7 +205,8 @@ async function onTotpSubmitted(token: string) {
 	}
 }
 
-async function tryLogin(req: Partial<Misskey.entities.SigninFlowRequest>): Promise<Misskey.entities.SigninFlowResponse> {
+async function tryLogin(req: Partial<Misskey.entities.SigninFlowRequest>): Promise<Misskey.entities.SigninFlowResponse | void> {
+	if (!active) return;
 	const _req = {
 		username: req.username ?? userInfo.value?.username,
 		...req,
@@ -196,11 +220,13 @@ async function tryLogin(req: Partial<Misskey.entities.SigninFlowRequest>): Promi
 		throw new Error('Invalid request');
 	}
 
-	return await misskeyApi('signin-flow', _req).then(async (res) => {
+	return await misskeyApi('signin-flow', _req, undefined, requestController.signal).then(async (res) => {
+		if (!active) return;
 		if (res.finished) {
 			emit('login', res);
 			await onLoginSucceeded(res);
 		} else {
+			waiting.value = false;
 			switch (res.next) {
 				case 'captcha': {
 					needCaptcha.value = true;
@@ -213,6 +239,7 @@ async function tryLogin(req: Partial<Misskey.entities.SigninFlowRequest>): Promi
 					break;
 				}
 				case 'totp': {
+					credentialRequest.value = null;
 					page.value = 'totp';
 					break;
 				}
@@ -228,19 +255,15 @@ async function tryLogin(req: Partial<Misskey.entities.SigninFlowRequest>): Promi
 			}
 
 			passwordPageEl.value?.resetCaptcha();
-			nextTick(() => {
-				waiting.value = false;
-			});
 		}
 		return res;
 	}).catch((err) => {
-		onSigninApiError(err);
-		return Promise.reject(err);
+		if (active) onSigninApiError(err);
 	});
 }
 
 async function onLoginSucceeded(res: Misskey.entities.SigninFlowResponse & { finished: true }) {
-	if (props.autoSet) {
+	if (active && props.autoSet) {
 		await login(res.i);
 	}
 }
@@ -334,9 +357,12 @@ function onSigninApiError(err?: any): void {
 }
 
 onBeforeUnmount(() => {
+	active = false;
+	requestController.abort();
 	password.value = '';
 	needCaptcha.value = false;
 	userInfo.value = null;
+	credentialRequest.value = null;
 });
 </script>
 
@@ -359,6 +385,10 @@ onBeforeUnmount(() => {
 	overflow-x: clip;
 
 	position: relative;
+}
+
+.updateButton {
+	margin: var(--MI-marginHalf) auto 0;
 }
 
 .waitingRoot {

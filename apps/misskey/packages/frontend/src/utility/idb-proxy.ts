@@ -12,6 +12,7 @@ import {
 	clear as iclear,
 } from 'idb-keyval';
 import { miLocalStorage } from '@/local-storage.js';
+import { desktopCredentialCodec } from '@/utility/desktop-credential-storage.js';
 
 const PREFIX = 'idbfallback::';
 
@@ -29,12 +30,23 @@ if (idbAvailable) {
 }
 
 export async function get(key: string) {
-	if (idbAvailable) return iget(key);
+	if (idbAvailable) {
+		const value = await iget(key);
+		const codec = desktopCredentialCodec(key);
+		if (!codec || value === undefined) return value;
+		if (codec.isSealed(value)) return JSON.parse(codec.open(value));
+		// Persist the protected copy before exposing a legacy login to callers.
+		await iset(key, codec.seal(JSON.stringify(value)));
+		return value;
+	}
 	return miLocalStorage.getItemAsJson(`${PREFIX}${key}`);
 }
 
 export async function set(key: string, val: any) {
-	if (idbAvailable) return iset(key, val);
+	if (idbAvailable) {
+		const codec = desktopCredentialCodec(key);
+		return iset(key, codec ? codec.seal(JSON.stringify(val)) : val);
+	}
 	return miLocalStorage.setItemAsJson(`${PREFIX}${key}`, val);
 }
 

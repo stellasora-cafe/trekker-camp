@@ -914,6 +914,7 @@ function getGameImageDriveFile() {
 
 				window.fetch(apiUrl + '/drive/files/create', {
 					method: 'POST',
+					headers: { 'X-Camp-Client': 'web-v1' },
 					body: formData,
 				})
 					.then(response => response.json())

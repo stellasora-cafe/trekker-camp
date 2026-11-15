@@ -8,7 +8,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	<component :is="currentPageComponent" :key="key" v-bind="Object.fromEntries(currentPageProps)"/>
 
 	<template #fallback>
-		<MkLoading/>
+		<MkLoadingPage/>
 	</template>
 </Suspense>
 </template>
@@ -24,13 +24,15 @@ const props = defineProps<{
 	router?: Router;
 }>();
 
-const router = props.router ?? inject(DI.router);
+const inheritedRouter = inject(DI.router);
+const router = props.router ?? inheritedRouter;
 
 if (router == null) {
 	throw new Error('no router provided');
 }
+provide(DI.router, router);
 
-const currentDepth = inject(DI.routerCurrentDepth, 0);
+const currentDepth = props.router != null && props.router !== inheritedRouter ? 0 : inject(DI.routerCurrentDepth, 0);
 provide(DI.routerCurrentDepth, currentDepth + 1);
 
 function resolveNested(current: PathResolvedResult, d = 0): PathResolvedResult | null {

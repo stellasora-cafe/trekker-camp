@@ -39,6 +39,7 @@ describe('API', () => {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
+				'X-Camp-Client': 'third-party-v1',
 			},
 			credentials: 'omit',
 			cache: 'no-cache',
@@ -79,6 +80,7 @@ describe('API', () => {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
+				'X-Camp-Client': 'third-party-v1',
 			},
 			credentials: 'omit',
 			cache: 'no-cache',
@@ -123,7 +125,7 @@ describe('API', () => {
 		expect(fetchMock).toHaveBeenCalledWith('https://misskey.test/api/drive/files/create', {
 			method: 'POST',
 			body: expect.any(FormData),
-			headers: {},
+			headers: { 'X-Camp-Client': 'third-party-v1' },
 			credentials: 'omit',
 			cache: 'no-cache',
 		});
@@ -154,6 +156,7 @@ describe('API', () => {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
+				'X-Camp-Client': 'third-party-v1',
 			},
 			credentials: 'omit',
 			cache: 'no-cache',

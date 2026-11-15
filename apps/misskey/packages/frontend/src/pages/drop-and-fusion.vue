@@ -4,80 +4,82 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<Transition
-	:enterActiveClass="$style.transition_zoom_enterActive"
-	:leaveActiveClass="$style.transition_zoom_leaveActive"
-	:enterFromClass="$style.transition_zoom_enterFrom"
-	:leaveToClass="$style.transition_zoom_leaveTo"
-	:moveClass="$style.transition_zoom_move"
-	mode="out-in"
->
-	<div v-if="!gameStarted" class="_spacer" style="--MI_SPACER-w: 800px;">
-		<div :class="$style.root">
-			<div class="_gaps">
-				<div class="_woodenFrame" style="text-align: center;">
-					<div class="_woodenFrameInner">
-						<img :src="'/client-assets/trekker-camp/characters/maou/bubble-game-logo-v1.png'" style="display: block; max-width: 100%; max-height: 200px; margin: auto;"/>
-					</div>
-				</div>
-				<div class="_woodenFrame" style="text-align: center;">
-					<div class="_woodenFrameInner">
-						<div class="_gaps" style="padding: 16px;">
-							<MkSelect v-model="gameMode" :items="gameModeDef">
-							</MkSelect>
-							<MkButton primary gradate large rounded inline @click="start">{{ i18n.ts.start }}</MkButton>
+<PageWithHeader>
+	<Transition
+		:enterActiveClass="$style.transition_zoom_enterActive"
+		:leaveActiveClass="$style.transition_zoom_leaveActive"
+		:enterFromClass="$style.transition_zoom_enterFrom"
+		:leaveToClass="$style.transition_zoom_leaveTo"
+		:moveClass="$style.transition_zoom_move"
+		mode="out-in"
+	>
+		<div v-if="!gameStarted" class="_spacer" style="--MI_SPACER-w: 800px;">
+			<div :class="$style.root">
+				<div class="_gaps">
+					<div class="_woodenFrame" style="text-align: center;">
+						<div class="_woodenFrameInner">
+							<img :src="'/client-assets/trekker-camp/characters/maou/bubble-game-logo-v1.png'" style="display: block; max-width: 100%; max-height: 200px; margin: auto;"/>
 						</div>
 					</div>
-					<div class="_woodenFrameInner">
-						<div class="_gaps" style="padding: 16px;">
-							<div style="font-size: 90%;"><i class="ti ti-music"></i> {{ i18n.ts.soundWillBePlayed }}</div>
-							<MkSwitch v-model="mute">
-								<template #label>{{ i18n.ts.mute }}</template>
-							</MkSwitch>
-						</div>
-					</div>
-				</div>
-				<div class="_woodenFrame">
-					<div class="_woodenFrameInner">
-						<div class="_gaps_s" style="padding: 16px;">
-							<div><b>{{ i18n.tsx.lastNDays({ n: 7 }) }} {{ i18n.ts.ranking }}</b> ({{ gameMode.toUpperCase() }})</div>
-							<div v-if="ranking" class="_gaps_s">
-								<div v-for="r in ranking" :key="r.id" :class="$style.rankingRecord">
-									<MkAvatar v-if="r.user" :link="true" style="width: 24px; height: 24px; margin-right: 4px;" :user="r.user"/>
-									<MkUserName v-if="r.user" :user="r.user" :nowrap="true"/>
-									<b style="margin-left: auto;">{{ r.score.toLocaleString() }} {{ getScoreUnit(gameMode) }}</b>
-								</div>
+					<div class="_woodenFrame" style="text-align: center;">
+						<div class="_woodenFrameInner">
+							<div class="_gaps" style="padding: 16px;">
+								<MkSelect v-model="gameMode" :items="gameModeDef">
+								</MkSelect>
+								<MkButton primary gradate large rounded inline @click="start">{{ i18n.ts.start }}</MkButton>
 							</div>
-							<div v-else>{{ i18n.ts.loading }}</div>
+						</div>
+						<div class="_woodenFrameInner">
+							<div class="_gaps" style="padding: 16px;">
+								<div style="font-size: 90%;"><i class="ti ti-music"></i> {{ i18n.ts.soundWillBePlayed }}</div>
+								<MkSwitch v-model="mute">
+									<template #label>{{ i18n.ts.mute }}</template>
+								</MkSwitch>
+							</div>
 						</div>
 					</div>
-				</div>
-				<div class="_woodenFrame">
-					<div class="_woodenFrameInner" style="padding: 16px;">
-						<div style="font-weight: bold;">{{ i18n.ts._bubbleGame.howToPlay }}</div>
-						<ol>
-							<li>{{ i18n.ts._bubbleGame._howToPlay.section1 }}</li>
-							<li>{{ i18n.ts._bubbleGame._howToPlay.section2 }}</li>
-							<li>{{ i18n.ts._bubbleGame._howToPlay.section3 }}</li>
-						</ol>
+					<div class="_woodenFrame">
+						<div class="_woodenFrameInner">
+							<div class="_gaps_s" style="padding: 16px;">
+								<div><b>{{ i18n.tsx.lastNDays({ n: 7 }) }} {{ i18n.ts.ranking }}</b> ({{ gameMode.toUpperCase() }})</div>
+								<div v-if="ranking" class="_gaps_s">
+									<div v-for="r in ranking" :key="r.id" :class="$style.rankingRecord">
+										<MkAvatar v-if="r.user" :link="true" style="width: 24px; height: 24px; margin-right: 4px;" :user="r.user"/>
+										<MkUserName v-if="r.user" :user="r.user" :nowrap="true"/>
+										<b style="margin-left: auto;">{{ r.score.toLocaleString() }} {{ getScoreUnit(gameMode) }}</b>
+									</div>
+								</div>
+								<div v-else>{{ i18n.ts.loading }}</div>
+							</div>
+						</div>
 					</div>
-				</div>
-				<div class="_woodenFrame">
-					<div class="_woodenFrameInner">
-						<div class="_gaps_s" style="padding: 16px;">
-							<div><b>Credit</b></div>
-							<div>
-								<div>Ai-chan illustration: @poteriri@misskey.io</div>
-								<div>BGM: @ys@misskey.design</div>
+					<div class="_woodenFrame">
+						<div class="_woodenFrameInner" style="padding: 16px;">
+							<div style="font-weight: bold;">{{ i18n.ts._bubbleGame.howToPlay }}</div>
+							<ol>
+								<li>{{ i18n.ts._bubbleGame._howToPlay.section1 }}</li>
+								<li>{{ i18n.ts._bubbleGame._howToPlay.section2 }}</li>
+								<li>{{ i18n.ts._bubbleGame._howToPlay.section3 }}</li>
+							</ol>
+						</div>
+					</div>
+					<div class="_woodenFrame">
+						<div class="_woodenFrameInner">
+							<div class="_gaps_s" style="padding: 16px;">
+								<div><b>Credit</b></div>
+								<div>
+									<div>Ai-chan illustration: @poteriri@misskey.io</div>
+									<div>BGM: @ys@misskey.design</div>
+								</div>
 							</div>
 						</div>
 					</div>
 				</div>
 			</div>
 		</div>
-	</div>
-	<XGame v-else :gameMode="gameMode" :mute="mute" @end="onGameEnd"/>
-</Transition>
+		<XGame v-else :gameMode="gameMode" :mute="mute" @end="onGameEnd"/>
+	</Transition>
+</PageWithHeader>
 </template>
 
 <script lang="ts" setup>

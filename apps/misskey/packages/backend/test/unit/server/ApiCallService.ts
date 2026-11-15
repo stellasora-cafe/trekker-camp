@@ -62,6 +62,7 @@ describe('ApiCallService structured error logging', () => {
 			};
 			const request = {
 				method: 'POST',
+				url: '/api/notes/show',
 				body: {
 					i: 'native-token',
 					password: 'password',

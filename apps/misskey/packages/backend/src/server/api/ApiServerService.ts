@@ -16,11 +16,13 @@ import { CaptchaService } from '@/core/CaptchaService.js';
 import type { ValidateChallengeBody } from 'capjs-core';
 import { RateLimiterService } from './RateLimiterService.js';
 import { bindThis } from '@/decorators.js';
+import { desktopUpdateRequired } from '../desktop-compatibility.js';
 import endpoints from './endpoints.js';
 import { ApiCallService } from './ApiCallService.js';
 import { SignupApiService } from './SignupApiService.js';
+import { clientSessionErrors } from './client-session-errors.js';
 import { SigninApiService } from './SigninApiService.js';
-import type { FastifyInstance, FastifyPluginOptions } from 'fastify';
+import type { FastifyInstance, FastifyPluginOptions, FastifyRequest, FastifyReply } from 'fastify';
 
 @Injectable()
 export class ApiServerService {
@@ -59,26 +61,32 @@ export class ApiServerService {
 			},
 		});
 
+		fastify.addHook('onRequest', async (request, reply) => {
+			if (request.method === 'OPTIONS') return;
+			const path = request.url.split('?')[0];
+			const protocol = request.headers['x-camp-client'];
+			const native = path.startsWith('/api/client/');
+			const signIn = /^\/api\/(?:client\/)?(?:signin-flow|signup|signup-pending)$/.test(path);
+			const authorization = /^\/api\/(?:app\/create|auth\/session\/|miauth\/)/.test(path);
+			if ((native && protocol !== 'desktop-v1') || (!native && protocol === 'desktop-v1') ||
+				(signIn && protocol !== (native ? 'desktop-v1' : 'web-v1')) ||
+				(authorization && protocol !== 'web-v1' && protocol !== 'third-party-v1')) {
+				return reply.code(403).send({ error: clientSessionErrors.clientProtocolRequired });
+			}
+			if (native) {
+				const incompatible = desktopUpdateRequired(request.headers, this.config.version);
+				if (incompatible) return reply.header('Cache-Control', 'no-store').code(426).send(incompatible);
+			}
+		});
+
 		// Prevent cache
 		fastify.addHook('onRequest', (request, reply, done) => {
 			reply.header('Cache-Control', 'private, max-age=0, must-revalidate');
 			done();
 		});
 
-		fastify.post('/cap/challenge', async (request, reply) => {
-			const limited = await this.rateLimiterService.limit({ key: 'cap-challenge', duration: 60000, max: 30 }, request.ip);
-			if (limited) return reply.code(429).send({ success: false });
-			return this.captchaService.capChallenge();
-		});
-		fastify.post<{ Body: ValidateChallengeBody }>('/cap/redeem', { bodyLimit: 65536 }, async (request, reply) => {
-			const limited = await this.rateLimiterService.limit({ key: 'cap-redeem', duration: 60000, max: 30 }, request.ip);
-			if (limited) return reply.code(429).send({ success: false });
-			if (!request.body || typeof request.body.token !== 'string' || !Array.isArray(request.body.solutions)) {
-				return reply.code(400).send({ success: false });
-			}
-			return this.captchaService.capRedeem(request.body);
-		});
-
+		type ApiRequest = { Body: Record<string, unknown>; Querystring: Record<string, unknown> };
+		const handlers = new Map<string, (request: FastifyRequest<ApiRequest>, reply: FastifyReply) => Promise<FastifyReply>>();
 		for (const endpoint of endpoints) {
 			const ep = {
 				name: endpoint.name,
@@ -86,77 +94,83 @@ export class ApiServerService {
 				params: endpoint.params,
 				exec: this.moduleRef.get('ep:' + endpoint.name, { strict: false }).exec,
 			};
-
-			if (endpoint.meta.requireFile) {
-				fastify.all<{
-					Params: { endpoint: string; },
-					Body: Record<string, unknown>,
-					Querystring: Record<string, unknown>,
-				}>('/' + endpoint.name, async (request, reply) => {
-					if (request.method === 'GET' && !endpoint.meta.allowGet) {
-						reply.code(405);
-						reply.send();
-						return;
-					}
-
-					// Await so that any error can automatically be translated to HTTP 500
+			const handler = async (request: FastifyRequest<ApiRequest>, reply: FastifyReply) => {
+				if (request.method === 'GET' && !ep.meta.allowGet) return reply.code(405).send();
+				if (ep.meta.requireFile) {
 					await this.apiCallService.handleMultipartRequest(ep, request, reply);
-					return reply;
-				});
-			} else {
-				fastify.all<{
-					Params: { endpoint: string; },
-					Body: Record<string, unknown>,
-					Querystring: Record<string, unknown>,
-				}>('/' + endpoint.name, { bodyLimit: 1024 * 1024 }, async (request, reply) => {
-					if (request.method === 'GET' && !endpoint.meta.allowGet) {
-						reply.code(405);
-						reply.send();
-						return;
-					}
-
-					// Await so that any error can automatically be translated to HTTP 500
+				} else {
 					await this.apiCallService.handleRequest(ep, request, reply);
-					return reply;
-				});
-			}
+				}
+				return reply;
+			};
+			handlers.set(ep.name, handler);
+			fastify.all<ApiRequest>('/' + ep.name, { bodyLimit: 1024 * 1024 }, handler);
 		}
 
-		fastify.post<{
-			Body: {
-				username: string;
-				password: string;
-				host?: string;
-				invitationCode?: string;
-				phoneChallengeId?: string;
-				phoneCode?: string;
-				emailChallengeId?: string;
-				emailCode?: string;
-				'hcaptcha-response'?: string;
-				'g-recaptcha-response'?: string;
-				'turnstile-response'?: string;
-				'm-captcha-response'?: string;
-				'testcaptcha-response'?: string;
-				'cap-token'?: string;
+		// Share endpoint handlers without duplicating the full Fastify route tree.
+		// Keep the original URL so protocol, session and version checks remain intact.
+		fastify.all<ApiRequest & { Params: { '*': string } }>('/client/*', { bodyLimit: 1024 * 1024 }, async (request, reply) => {
+			const handler = handlers.get(request.params['*']);
+			if (!handler) {
+				return reply.code(404).send({ error: {
+					message: 'Unknown API endpoint.', code: 'UNKNOWN_API_ENDPOINT',
+					id: '2ca3b769-540a-4f08-9dd5-b5a825b6d0f1', kind: 'client',
+				} });
 			}
-		}>('/signup', (request, reply) => this.signupApiService.signup(request, reply));
+			return handler(request, reply);
+		});
 
-		fastify.post<{
-			Body: {
-				username: string;
-				password?: string;
-				token?: string;
-				credential?: AuthenticationResponseJSON;
-				'hcaptcha-response'?: string;
-				'g-recaptcha-response'?: string;
-				'turnstile-response'?: string;
-				'm-captcha-response'?: string;
-				'testcaptcha-response'?: string;
-				'cap-token'?: string;
-			};
-		}>('/signin-flow', (request, reply) => this.signinApiService.signin(request, reply));
+		for (const apiPrefix of ['', '/client']) {
+			fastify.post(apiPrefix + '/cap/challenge', async (request, reply) => {
+				const limited = await this.rateLimiterService.limit({ key: 'cap-challenge', duration: 60000, max: 30 }, request.ip);
+				if (limited) return reply.code(429).send({ success: false });
+				return this.captchaService.capChallenge();
+			});
+			fastify.post<{ Body: ValidateChallengeBody }>(apiPrefix + '/cap/redeem', { bodyLimit: 65536 }, async (request, reply) => {
+				const limited = await this.rateLimiterService.limit({ key: 'cap-redeem', duration: 60000, max: 30 }, request.ip);
+				if (limited) return reply.code(429).send({ success: false });
+				if (!request.body || typeof request.body.token !== 'string' || !Array.isArray(request.body.solutions)) {
+					return reply.code(400).send({ success: false });
+				}
+				return this.captchaService.capRedeem(request.body);
+			});
 
-		fastify.post<{ Body: { code: string; } }>('/signup-pending', (request, reply) => this.signupApiService.signupPending(request, reply));
+			fastify.post<{
+				Body: {
+					username: string;
+					password: string;
+					host?: string;
+					invitationCode?: string;
+					phoneChallengeId?: string;
+					phoneCode?: string;
+					emailChallengeId?: string;
+					emailCode?: string;
+					'hcaptcha-response'?: string;
+					'g-recaptcha-response'?: string;
+					'turnstile-response'?: string;
+					'm-captcha-response'?: string;
+					'testcaptcha-response'?: string;
+					'cap-token'?: string;
+				}
+			}>(apiPrefix + '/signup', (request, reply) => this.signupApiService.signup(request, reply));
+
+			fastify.post<{
+				Body: {
+					username: string;
+					password?: string;
+					token?: string;
+					credential?: AuthenticationResponseJSON;
+					'hcaptcha-response'?: string;
+					'g-recaptcha-response'?: string;
+					'turnstile-response'?: string;
+					'm-captcha-response'?: string;
+					'testcaptcha-response'?: string;
+					'cap-token'?: string;
+				};
+			}>(apiPrefix + '/signin-flow', (request, reply) => this.signinApiService.signin(request, reply));
+
+			fastify.post<{ Body: { code: string; } }>(apiPrefix + '/signup-pending', (request, reply) => this.signupApiService.signupPending(request, reply));
+		}
 
 		fastify.get('/v1/instance/peers', async (request, reply) => {
 			const instances = await this.instancesRepository.find({
