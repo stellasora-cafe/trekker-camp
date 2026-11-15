@@ -18,7 +18,7 @@
 sudo -i
 apt-get update
 apt-get install -y ca-certificates curl python3
-release=server-v2026.11.0
+release=server-v0.1.0
 curl -fsSL "https://raw.githubusercontent.com/stellasora-cafe/trekker-camp/$release/scripts/deploy.sh" -o /tmp/camp-deploy.sh
 bash /tmp/camp-deploy.sh install --release "$release" --url https://camp.example.com
 ```
@@ -36,7 +36,7 @@ CLI 只接受 GitHub 已发布的服务端 Release，验证归档白名单、标
 对于此前从 `HePudding` 仓库 clone 并部署的服务器，首次升级使用新组织的固定版本引导脚本。先查看 `camp status` 确认现有部署目录，再执行（替换为实际发布标签）：
 
 ```bash
-release=server-v2026.11.0
+release=server-v0.1.0
 curl -fsSL "https://raw.githubusercontent.com/stellasora-cafe/trekker-camp/$release/scripts/deploy.sh" -o /tmp/camp-deploy.sh
 sudo bash /tmp/camp-deploy.sh self-update --release "$release"
 sudo camp update --release "$release"
@@ -89,14 +89,14 @@ bash /tmp/camp-deploy.sh install --url https://camp.example.com --data-dir /srv/
 
 ## 发布服务端版本
 
-通过 `server-vX.Y.Z` 标签发布，例如 `server-v2026.11.0`；标签版本须与根目录及 `apps/misskey/package.json` 的 `version` 一致。`.github/workflows/server-release.yml` 在标签上构建 amd64 / arm64 的应用与 Caddy 镜像，并创建 GitHub Release 草稿。维护者检查产物后发布草稿，服务器才能获取它。桌面版本使用独立的 `desktop-v*` 标签，互不影响。
+通过 `server-vX.Y.Z` 标签发布，例如 `server-v0.1.0`；标签版本须与根目录及 `apps/misskey/package.json` 的 `version` 一致。`.github/workflows/server-release.yml` 在标签上构建 amd64 / arm64 的应用与 Caddy 镜像，并创建 GitHub Release 草稿。维护者检查产物后发布草稿，服务器才能获取它。桌面版本使用独立的 `desktop-v*` 标签，互不影响。
 
 Release 附件 `camp-server-server-vX.Y.Z.tar.gz` 只包含部署 CLI、Compose、示例配置及 `RELEASE.json`，不含私有素材、字体、图片、凭据、Git 工作副本或代理说明文件。镜像在 `compose.release.yml` 中固定到 digest，不依赖可变的 `latest` 标签。完整对应源码仍由同一 Git 标签、GitHub 源码归档及应用内源码下载提供；私有素材不进入这些源码包。
 
 VPS 保存每次候选版本到 `.releases/`。下载、校验和镜像预检失败时，现有版本记录保持不变；数据库备份成功后，在迁移前原子记录 `.config/server-release`，确保后续启动使用同一版应用。迁移失败时保持停站，不自动用旧应用连接已变更的数据库。旧版本目录与更新前备份保留，回滚数据库由维护者明确操作。
 
 ```bash
-sudo camp update --release server-v2026.11.0
+sudo camp update --release server-v0.1.0
 ```
 
 ## 更新与日常操作

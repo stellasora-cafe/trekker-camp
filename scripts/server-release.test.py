@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 spec = importlib.util.spec_from_file_location('release_builder', ROOT / 'scripts/build-server-release.py')
 builder = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(builder)
-TAG = 'server-v2026.11.0'
+TAG = 'server-v0.1.0'
 WEB = 'ghcr.io/stellasora-cafe/trekker-camp@sha256:' + 'a' * 64
 CADDY = 'ghcr.io/stellasora-cafe/trekker-camp-caddy@sha256:' + 'b' * 64
 
