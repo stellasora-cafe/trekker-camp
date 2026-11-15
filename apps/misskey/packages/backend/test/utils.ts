@@ -20,6 +20,7 @@ import type * as misskey from 'misskey-js';
 import { DEFAULT_POLICIES } from '@/core/RoleService.js';
 import { validateContentTypeSetAsActivityPub } from '@/core/activitypub/misc/validator.js';
 import { IdService } from '@/core/IdService.js';
+import { MiUser } from '@/models/User.js';
 import { MiRegistrationTicket } from '@/models/RegistrationTicket.js';
 import { verificationCode } from './misc/verification-code.js';
 import { ApiError } from '@/server/api/error.js';
@@ -169,6 +170,16 @@ export async function signupParameters(params?: Partial<misskey.Endpoints['signu
 export const signup = async (params?: Partial<misskey.Endpoints['signup']['req']>): Promise<NonNullable<misskey.Endpoints['signup']['res']>> => {
 	const res = await api('signup', await signupParameters(params));
 	assert.strictEqual(res.status, 200, inspect(res.body));
+	if (params?.host) {
+		// Archived remote fixtures use legacy credentials; client sessions are local-only.
+		const db = await initTestDb(true);
+		try {
+			const user = await db.getRepository(MiUser).findOneByOrFail({ id: res.body.id });
+			return { ...res.body, token: user.token! };
+		} finally {
+			await db.destroy();
+		}
+	}
 	return res.body;
 };
 

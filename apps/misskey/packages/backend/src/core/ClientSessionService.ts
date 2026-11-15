@@ -67,7 +67,7 @@ export class ClientSessionService {
 		const session = await this.sessions.findOneBy({ tokenHash: digest(token), kind });
 		if (!session) return null;
 		const user = await this.users.findOneBy({ id: session.userId });
-		if (!user || user.host !== null || user.isSuspended || user.isDeleted) return null;
+		if (!user || user.host !== null || user.isSuspended) return null;
 		await this.sessions.update({ id: session.id, lastActiveAt: LessThan(new Date(Date.now() - 60_000)) }, { lastActiveAt: new Date() });
 		return { user: user as MiLocalUser, session };
 	}

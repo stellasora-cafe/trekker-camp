@@ -149,7 +149,7 @@ describe('embedded router ownership', () => {
 			...mainRouter,
 			currentRef: shallowRef({ route: { path }, _parsedRoute: { fullPath: path } }),
 			replaceByPath: vi.fn(),
-		} as typeof mainRouter;
+		} as unknown as typeof mainRouter;
 		vi.mocked(useRouter).mockReturnValue(router);
 		return router;
 	}

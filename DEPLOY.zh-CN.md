@@ -25,6 +25,24 @@ bash /tmp/camp-deploy.sh install --release "$release" --url https://camp.example
 
 CLI 只接受 GitHub 已发布的服务端 Release，验证归档白名单、标签、提交号及镜像摘要后再生成配置。未指定 `--release` 时选择最新稳定 `server-v*` Release，忽略桌面版本、草稿和预发行版。开发分支和未发布标签不会被部署。
 
+### 现有服务器迁移到组织仓库与 Release 部署
+
+本次服务端版本保留桌面浏览器授权、设备会话、版本兼容检查与前端资源接口。桌面程序可以在服务端发布后单独进行真实连接测试和发布，无需同步发布安装器。
+
+将服务端 PR 合入 `master` 并完成检查后，在该提交创建与两个 `package.json` 版本一致的 `server-v*` 标签。发布工作流拒绝未合入 `master` 的提交；构建多架构镜像和精简部署包后生成草稿 Release，检查完成并正式发布后 CLI 才会安装。桌面版本使用独立发布流程。
+
+对于此前从 `HePudding` 仓库 clone 并部署的服务器，首次升级使用新组织的固定版本引导脚本。先查看 `camp status` 确认现有部署目录，再执行（替换为实际发布标签）：
+
+```bash
+release=server-v2026.11.0
+curl -fsSL "https://raw.githubusercontent.com/stellasora-cafe/trekker-camp/$release/scripts/deploy.sh" -o /tmp/camp-deploy.sh
+sudo bash /tmp/camp-deploy.sh self-update --release "$release"
+sudo camp update --release "$release"
+sudo camp status
+```
+
+若旧 CLI 尚未保存部署目录，在 `camp update` 后追加 `--dir <现有部署目录>`。CLI 保留数据目录、应用配置、已保存的 PAT、备份和自启设置；旧主仓库源码保持原样，后续运行使用 Release 镜像。私有素材通过新组织地址验证并快进同步后，才将原有 HTTPS/SSH `origin` 迁到 `https://github.com/stellasora-cafe/trekker-camp-assets.git`；访问失败时保留原工作副本和远程地址。已保存 PAT 继续复用；若组织转移后权限已失效，需要提供对新组织素材仓有效的只读 PAT，成功读取后才替换已保存凭据。
+
 将示例域名替换为本站域名。CLI 会隐藏输入 GitHub 细粒度 PAT 和 Cloudflare token，也会读取已有的 `GH_TOKEN`、`GITHUB_TOKEN`、`CLOUDFLARE_API_TOKEN`。私有素材访问成功后，GitHub PAT 自动保存到数据目录的 `.config/github-token`，权限为 root `0600`；后续自动读取，无需安装或登录 `gh`。首次安装后通过 `camp` 命令操作。
 
 安装自动完成：

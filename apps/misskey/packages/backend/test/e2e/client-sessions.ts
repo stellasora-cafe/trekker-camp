@@ -10,6 +10,7 @@ import WebSocket from 'ws';
 import type { DataSource } from 'typeorm';
 import { MiClientSession } from '@/models/ClientSession.js';
 import { MiUser } from '@/models/User.js';
+import { loadConfig } from '@/config.js';
 import { api, createAppToken, initTestDb, relativeFetch, signup } from '../utils.js';
 
 type Authorization = { requestId: string; secret: string; authorizeUrl: string; expiresAt: string };
@@ -39,8 +40,8 @@ describe('Camp client sessions', () => {
 	let thirdPartyToken: string;
 
 	beforeAll(async () => {
-		expect((await request('admin/accounts/create', { username: 'clientadmin', password: 'test' })).status).toBe(403);
-		const setup = await request('admin/accounts/create', { username: 'clientadmin', password: 'test' }, 'web-v1');
+		expect((await request('admin/accounts/create', { username: 'clientadmin', password: 'test', setupPassword: loadConfig().setupPassword })).status).toBe(403);
+		const setup = await request('admin/accounts/create', { username: 'clientadmin', password: 'test', setupPassword: loadConfig().setupPassword }, 'web-v1');
 		expect(setup.status).toBe(200);
 		administrator = setup.body;
 		alice = await signup({ username: 'clientalice' });
@@ -76,6 +77,17 @@ describe('Camp client sessions', () => {
 		expect(JSON.stringify(session)).not.toContain(desktopToken);
 		expect((await request('client/i', {}, 'desktop-v1', desktopToken)).body.id).toBe(alice.id);
 		expect((await request('i', {}, 'web-v1', alice.token)).body.id).toBe(alice.id);
+	});
+
+	test('queued account deletion remains visible until physical deletion revokes sessions', async () => {
+		const deleting = await signup({ username: 'clientdeleting' });
+		await db.getRepository(MiUser).update(deleting.id, { isDeleted: true });
+		const account = await request('i', {}, 'web-v1', deleting.token);
+		expect(account.status).toBe(200);
+		expect(account.body.isDeleted).toBe(true);
+		await db.getRepository(MiUser).delete(deleting.id);
+		expect(await db.getRepository(MiClientSession).countBy({ userId: deleting.id })).toBe(0);
+		expect((await request('i', {}, 'web-v1', deleting.token)).status).toBe(401);
 	});
 
 	test('password login preserves the existing step flow and rejects wrong passwords', async () => {

@@ -103,7 +103,7 @@ describe('Desktop business API gate', () => {
 	beforeAll(async () => {
 		moduleRef.get.mockReturnValue({ exec: vi.fn() });
 		apiCalls.handleRequest.mockImplementation(async (_ep, _request, reply) => { reply.send({ ok: true }); });
-		const service = new ApiServerService(moduleRef, config, mockDeep(), mockDeep(), mockDeep(), apiCalls, mockDeep(), mockDeep(), mockDeep(), mockDeep(), mockDeep());
+		const service = new ApiServerService(moduleRef, config, mockDeep(), mockDeep(), mockDeep(), apiCalls, mockDeep(), mockDeep(), mockDeep(), mockDeep());
 		fastify.register(service.createServer, { prefix: '/api' });
 		await fastify.ready();
 	});

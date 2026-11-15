@@ -67,7 +67,7 @@ describe('desktop authentication window', () => {
 	test('route accepts only mode and a username hint without requiring an existing session', () => {
 		const route = ROUTE_DEF.find(route => route.path === '/desktop-auth');
 		expect(route).toMatchObject({ query: { mode: 'mode', username: 'username' } });
-		expect(route?.loginRequired).not.toBe(true);
+		expect(route).not.toMatchObject({ loginRequired: true });
 	});
 
 	test.each([undefined, 'signin', 'unknown'])('sign in mode %s persists the completed session through the normal login flow', async mode => {

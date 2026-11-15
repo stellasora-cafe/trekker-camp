@@ -20,7 +20,6 @@ import { desktopUpdateRequired } from '../desktop-compatibility.js';
 import endpoints from './endpoints.js';
 import { ApiCallService } from './ApiCallService.js';
 import { SignupApiService } from './SignupApiService.js';
-import { SigninWithPasskeyApiService } from './SigninWithPasskeyApiService.js';
 import { clientSessionErrors } from './client-session-errors.js';
 import { SigninApiService } from './SigninApiService.js';
 import type { FastifyInstance, FastifyPluginOptions } from 'fastify';
@@ -42,7 +41,6 @@ export class ApiServerService {
 		private userEntityService: UserEntityService,
 		private apiCallService: ApiCallService,
 		private signupApiService: SignupApiService,
-		private signinWithPasskeyApiService: SigninWithPasskeyApiService,
 		private signinApiService: SigninApiService,
 		private captchaService: CaptchaService,
 		private rateLimiterService: RateLimiterService,
@@ -68,7 +66,7 @@ export class ApiServerService {
 			const path = request.url.split('?')[0];
 			const protocol = request.headers['x-camp-client'];
 			const native = path.startsWith('/api/client/');
-			const signIn = /^\/api\/(?:client\/)?(?:signin-flow|signin-with-passkey|signup|signup-pending)$/.test(path);
+			const signIn = /^\/api\/(?:client\/)?(?:signin-flow|signup|signup-pending)$/.test(path);
 			const authorization = /^\/api\/(?:app\/create|auth\/session\/|miauth\/)/.test(path);
 			if ((native && protocol !== 'desktop-v1') || (!native && protocol === 'desktop-v1') ||
 				(signIn && protocol !== (native ? 'desktop-v1' : 'web-v1')) ||
@@ -180,9 +178,6 @@ export class ApiServerService {
 			}>(apiPrefix + '/signin-flow', (request, reply) => this.signinApiService.signin(request, reply));
 
 			fastify.post<{ Body: { code: string; } }>(apiPrefix + '/signup-pending', (request, reply) => this.signupApiService.signupPending(request, reply));
-
-			fastify.post<{ Body: { credential?: AuthenticationResponseJSON; context?: string } }>(apiPrefix + '/signin-with-passkey',
-				(request, reply) => this.signinWithPasskeyApiService.signin(request, reply));
 		}
 
 		fastify.get('/v1/instance/peers', async (request, reply) => {

@@ -102,6 +102,49 @@ sync_checkout "$TEST_ROOT/checkout" https://github.com/stellasora-cafe/trekker-c
         self.git(repo, "remote", "add", "origin", "https://github.com/HePudding/trekker-camp-assets.git")
         self.shell('check_checkout "$TEST_ROOT/checkout" https://github.com/stellasora-cafe/trekker-camp-assets.git')
 
+    def test_transferred_assets_fetches_new_owner_and_preserves_saved_credentials(self):
+        source = self.repository("upstream", {"README.md": "first", ".gitignore": ".config/\n"})
+        checkout = self.root / "checkout"
+        subprocess.run(["git", "clone", str(source), str(checkout)], env=self.env, check=True, capture_output=True)
+        config = checkout / ".config"
+        config.mkdir()
+        token = config / "github-token"
+        token.write_text(GITHUB_TEST_PAT)
+        token.chmod(0o600)
+        (source / "README.md").write_text("updated")
+        self.git(source, "commit", "-am", "Update assets")
+        self.redirect(source, ASSETS_REPO)
+        for remote in (
+            "https://github.com/HePudding/trekker-camp-assets.git",
+            "git@github.com:HePudding/trekker-camp-assets.git",
+            "ssh://git@github.com/HePudding/trekker-camp-assets.git",
+            "git@github.com:stellasora-cafe/trekker-camp-assets.git",
+        ):
+            with self.subTest(remote=remote):
+                self.git(checkout, "remote", "set-url", "origin", remote)
+                self.shell('''
+github_token=$TEST_GITHUB_PAT
+auth_dir="$TEST_ROOT"
+sync_checkout "$TEST_ROOT/checkout" https://github.com/stellasora-cafe/trekker-camp-assets.git
+''')
+                self.assertEqual(self.git(checkout, "config", "--get", "remote.origin.url"), ASSETS_REPO)
+                self.assertEqual(self.git(checkout, "rev-parse", "HEAD"), self.git(source, "rev-parse", "HEAD"))
+                self.assertEqual(token.read_text(), GITHUB_TEST_PAT)
+                self.assertEqual(token.stat().st_mode & 0o777, 0o600)
+
+    def test_transferred_assets_failed_access_preserves_checkout_and_origin(self):
+        checkout = self.repository("checkout", {"README.md": "existing assets"})
+        remote = "https://github.com/HePudding/trekker-camp-assets.git"
+        self.git(checkout, "remote", "add", "origin", remote)
+        revision = self.git(checkout, "rev-parse", "HEAD")
+        self.shell('''
+github_git() { return 1; }
+sync_checkout "$TEST_ROOT/checkout" https://github.com/stellasora-cafe/trekker-camp-assets.git
+''', success=False)
+        self.assertEqual(self.git(checkout, "config", "--get", "remote.origin.url"), remote)
+        self.assertEqual(self.git(checkout, "rev-parse", "HEAD"), revision)
+        self.assertEqual((checkout / "README.md").read_text(), "existing assets")
+
     def test_supported_lts_and_architectures_select_matching_docker_source(self):
         for version, codename in (("22.04", "jammy"), ("24.04", "noble"), ("26.04", "resolute")):
             for architecture in ("amd64", "arm64"):

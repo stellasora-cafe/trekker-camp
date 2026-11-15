@@ -43,7 +43,7 @@ describe('real Nirax and browser history', () => {
 		expect(browser.location.pathname).toBe('/chat');
 		expect(router.getCurrentFullPath()).toBe('/chat');
 		expect(browser.history.length).toBe(length);
-		expect(browser.history.state.campPageHistory.previous).toBeNull();
+		expect(browser.history.state).toMatchObject({ campPageHistory: { previous: null } });
 	});
 
 	test('push and back restore actual entries without overrunning the root', async () => {
@@ -54,7 +54,7 @@ describe('real Nirax and browser history', () => {
 		expect(router.getCurrentFullPath()).toBe('/chat');
 		await traversed(() => history.back('/'));
 		expect(browser.location.pathname).toBe('/');
-		expect(browser.history.state.campPageHistory.previous).toBeNull();
+		expect(browser.history.state).toMatchObject({ campPageHistory: { previous: null } });
 		history.back('/');
 		expect(browser.location.pathname).toBe('/');
 	});
@@ -68,10 +68,10 @@ describe('real Nirax and browser history', () => {
 		const binding = bindPageHistory(restored, browser as unknown as Window);
 		cleanups.push(async () => { binding.dispose(); });
 		restored.init();
-		expect(browser.history.state.retained).toBe('position');
+		expect(browser.history.state).toMatchObject({ retained: 'position' });
 		await traversed(() => binding.back('/'));
 		expect(restored.getCurrentFullPath()).toBe('/chat');
-		expect(browser.history.state.retained).toBe('position');
+		expect(browser.history.state).toMatchObject({ retained: 'position' });
 	});
 
 	test('redirects to the current route do not add duplicate back steps', async () => {
@@ -99,7 +99,7 @@ describe('real Nirax and browser history', () => {
 		await traversed(() => history.back('/'));
 		expect(browser.location.pathname + browser.location.hash).toBe('/notes/one');
 		expect(router.getCurrentFullPath()).toBe('/notes/one');
-		expect(browser.history.state.campPageHistory.previous).toBeNull();
+		expect(browser.history.state).toMatchObject({ campPageHistory: { previous: null } });
 		history.back('/');
 		expect(browser.location.pathname).toBe('/');
 	});
@@ -112,7 +112,7 @@ describe('real Nirax and browser history', () => {
 		expect(router.getCurrentFullPath()).toBe('/notes/one#reply');
 		await traversed(() => history.back('/'));
 		expect(browser.location.hash).toBe('');
-		expect(browser.history.state.campPageHistory.previous).toBeNull();
+		expect(browser.history.state).toMatchObject({ campPageHistory: { previous: null } });
 	});
 
 	test('legacy depth and mismatched markers cannot trigger external back', () => {
@@ -121,8 +121,8 @@ describe('real Nirax and browser history', () => {
 		router.init();
 		history.back('/');
 		expect(browser.location.pathname).toBe('/');
-		expect(browser.history.state.campPageHistory.previous).toBeNull();
-		expect(browser.history.state.campPageDepth).toBeUndefined();
+		expect(browser.history.state).toMatchObject({ campPageHistory: { previous: null } });
+		expect(browser.history.state).not.toHaveProperty('campPageDepth');
 	});
 
 	test('minimum-shell tools replace the document to reach the main shell', () => {

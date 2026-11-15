@@ -100,7 +100,7 @@ describe('router view context', () => {
 				return () => h('div');
 			},
 		});
-		const router = new Nirax([{ path: '/pending', component: Pending }], '/pending', true, Child) as Router;
+		const router = new Nirax([{ path: '/pending', component: Pending }], '/pending', true, Child) as unknown as Router;
 		router.init();
 		const outer = createRouter('/main');
 		const view = render(Component, { props: { router }, global: context(outer, 3) });

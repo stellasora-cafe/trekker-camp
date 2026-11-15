@@ -471,10 +471,14 @@ check_checkout() {
 	local directory=$1 repository=$2 remote
 	[[ -e $directory/.git ]] || fail "$directory 不是独立 Git 工作副本。"
 	remote=$(git -C "$directory" config --get remote.origin.url)
-	if [[ $repository == https://github.com/stellasora-cafe/trekker-camp.git && $remote == https://github.com/HePudding/trekker-camp.git ]] ||
-		[[ $repository == https://github.com/stellasora-cafe/trekker-camp-assets.git && $remote == https://github.com/HePudding/trekker-camp-assets.git ]]; then
-		remote=$repository
+	# Accept the team's transferred repository, including previous SSH checkouts.
+	remote=${remote%.git}
+	remote=${remote/#git@github.com:/https://github.com/}
+	remote=${remote/#ssh:\/\/git@github.com\//https://github.com/}
+	if [[ $remote == https://github.com/HePudding/trekker-camp || $remote == https://github.com/HePudding/trekker-camp-assets ]]; then
+		remote=${remote/\/HePudding\//\/stellasora-cafe\/}
 	fi
+	remote+=.git
 	[[ $remote == "$repository" ]] || fail "$directory 的 origin 需为 $repository。"
 	[[ $(git -C "$directory" symbolic-ref --quiet --short HEAD) == master ]] || fail "$directory 需位于 master 分支。"
 	[[ -z $(git -C "$directory" status --porcelain --untracked-files=all) ]] || fail "$directory 有本地改动，请先保存；部署已停止。"
@@ -486,9 +490,11 @@ sync_checkout() {
 		github_git clone --branch master --single-branch "$repository" "$directory"
 	fi
 	check_checkout "$directory" "$repository"
-	github_git -C "$directory" fetch --no-tags origin master
+	# Use the canonical owner before authentication; do not rely on a redirect.
+	github_git -C "$directory" fetch --no-tags "$repository" refs/heads/master:refs/remotes/origin/master
 	git -C "$directory" merge-base --is-ancestor HEAD origin/master || fail "$directory 存在未发布提交或分叉，部署已停止。"
 	GIT_LFS_SKIP_SMUDGE=1 git -C "$directory" merge --ff-only origin/master
+	git -C "$directory" remote set-url origin "$repository"
 }
 
 check_deployment_source() {
