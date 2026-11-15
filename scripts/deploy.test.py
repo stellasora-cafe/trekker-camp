@@ -44,7 +44,7 @@ class DeployTests(unittest.TestCase):
             "GIT_COMMITTER_NAME": "Deployment test",
             "GIT_COMMITTER_EMAIL": "deploy@example.invalid",
         }
-        for name in ("GH_TOKEN", "GITHUB_TOKEN", "CAMP_GH_TOKEN", "CLOUDFLARE_API_TOKEN"):
+        for name in ("GH_TOKEN", "GITHUB_TOKEN", "GHCR_TOKEN", "CAMP_GH_TOKEN", "CLOUDFLARE_API_TOKEN"):
             self.env.pop(name, None)
 
     def shell(self, body, success=True, timeout=30):
@@ -575,6 +575,7 @@ install_cli() {
   if [[ $TEST_ACTION == update ]]; then [[ -f $config_dir/maintenance/updating ]] || fail 'maintenance must cover CLI installation'; fi
   printf 'install-cli\n' >> "$TEST_ROOT/events"
 }
+pull_release_images() { compose pull web caddy; }
 release_source=$TEST_RELEASE_DIR
 if [[ $TEST_ACTION == update ]]; then begin_update_maintenance; fi
 deploy "$TEST_ACTION"
@@ -699,6 +700,45 @@ archive_legacy_checkout "$backup_dir"
                     self.assertFalse(any("--force-recreate" in event for event in events))
                 if failure == "health":
                     self.assertEqual(events[-1], "stop web")
+
+    def test_private_registry_authentication_is_temporary_and_saved_only_after_pull(self):
+        checkout = self.configuration()
+        token_path = checkout / '.config/ghcr-token'
+        token_path.write_text('ghp_previous')
+        for failure in ('login', 'pull', ''):
+            self.env['REGISTRY_FAILURE'] = failure
+            result = self.shell('''
+ghcr_token=ghp_testreadpackages
+curl() {
+  [[ $* != *"$ghcr_token"* ]] || exit 99
+  printf '{"login":"fixture-user"}'
+}
+docker() {
+  [[ $* == 'login ghcr.io --username fixture-user --password-stdin' ]] || exit 99
+  [[ $(cat) == "$ghcr_token" ]] || exit 99
+  [[ $(stat -c %a "$DOCKER_CONFIG") == 700 ]] || exit 99
+  printf '%s' "$DOCKER_CONFIG" > "$TEST_ROOT/docker-config-path"
+  [[ $REGISTRY_FAILURE != login ]]
+}
+compose() { [[ $* == 'pull web caddy' && $REGISTRY_FAILURE != pull ]]; }
+pull_release_images
+''', success=not failure)
+            self.assertNotIn('ghp_testreadpackages', result.stdout + result.stderr)
+            self.assertEqual(token_path.read_text().strip(), 'ghp_previous' if failure else 'ghp_testreadpackages')
+            self.assertFalse(Path((self.root / 'docker-config-path').read_text()).exists())
+        self.assertEqual(token_path.stat().st_mode & 0o777, 0o600)
+
+    def test_private_registry_reuses_saved_token_and_rejects_fine_grained_token(self):
+        checkout = self.configuration()
+        (checkout / '.config/ghcr-token').write_text('ghp_saved')
+        self.shell('''
+curl() { printf '{"login":"fixture-user"}'; }
+docker() { [[ $(cat) == ghp_saved ]]; }
+compose() { :; }
+pull_release_images
+''')
+        result = self.shell('ghcr_token=github_pat_fixture; pull_release_images', success=False)
+        self.assertIn('classic PAT', result.stderr)
 
     def test_final_https_failure_reinstates_maintenance_and_stops_application(self):
         checkout, events, _ = self.deployment("final-https", release=True)

@@ -31,7 +31,7 @@ usage() {
 选项：
   --dir PATH   覆盖本次操作的代码目录；默认使用已记录目录，首次为 /opt/trekker-camp
   --data-dir PATH  首次安装的数据目录，默认与部署目录相同；后续自动读取
-  --release TAG  指定已发布的 server-v版本号；默认最新稳定服务端 Release
+  --build ID  指定 Actions 构建编号；默认最新成功的 master 服务端产物
   --url URL    首次部署的 HTTPS 域名；Cloudflare DNS 指向 VPS，开放 TCP 80/443
   -h, --help   显示帮助
 
@@ -40,7 +40,9 @@ usage() {
 首次安装默认站点为 https://camp.stellasora.cafe；方括号内的默认值可直接回车采用。
 首次安装自动生成管理员初始化密码；部署完成或运行 camp status 时查看。
 认证依次读取 GH_TOKEN、GITHUB_TOKEN、数据目录 .config/github-token，或交互式隐藏输入。
-使用仅授权私有素材仓库 Contents: Read-only 的细粒度 PAT，无需安装 gh。
+使用主仓库 Actions: Read 和素材仓库 Contents: Read 的细粒度 PAT，无需安装 gh。
+私有镜像另需 classic PAT 的 read:packages 权限，通过 GHCR_TOKEN 或隐藏输入提供。
+镜像拉取成功后保存到数据目录 .config/ghcr-token（root 0600），后续自动复用。
 访问素材成功后自动保存 PAT（仅 root 可读写），重开终端和 CLI 自更新后继续使用。
 更换 PAT 时注入 GH_TOKEN，例如 sudo --preserve-env=GH_TOKEN camp update。
 首次安装读取 CLOUDFLARE_API_TOKEN 或隐藏输入，用于 DNS 验证及自动续期证书。
@@ -131,9 +133,9 @@ tui_run() {
 	local runner=(bash "$cli_entry")
 	if [[ $EUID != 0 && $1 != version ]]; then
 		if ! command -v sudo >/dev/null; then printf '请以 root 运行 camp，或先安装 sudo。\n' >&2; return 1; fi
-		runner=(sudo '--preserve-env=GH_TOKEN,CLOUDFLARE_API_TOKEN,R2_ENDPOINT,R2_BUCKET,R2_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY,R2_BACKUP_PASSWORD' -- "${runner[@]}")
+		runner=(sudo '--preserve-env=GH_TOKEN,GHCR_TOKEN,CLOUDFLARE_API_TOKEN,R2_ENDPOINT,R2_BUCKET,R2_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY,R2_BACKUP_PASSWORD' -- "${runner[@]}")
 	fi
-	GH_TOKEN="$github_token" CLOUDFLARE_API_TOKEN="$cloudflare_token" "${runner[@]}" "$@"
+	GH_TOKEN="$github_token" GHCR_TOKEN="${ghcr_token:-}" CLOUDFLARE_API_TOKEN="$cloudflare_token" "${runner[@]}" "$@"
 }
 
 tui_read_default() {
@@ -255,52 +257,80 @@ install_cli() {
 	fi
 }
 
-# A release contains deployment files only; application code runs from pinned images.
+# Actions artifacts contain deployment files only; code runs from pinned images.
 download_release() (
-	local destination=$1 requested=${2:-} metadata archive tag
+	set +x
+	local destination=$1 requested=${2:-} metadata archive auth runs selected='' run_id commit artifact_id
+	local token=${github_token:-}
+	umask 077
 	install -d -m 0755 "$destination"
 	metadata=$(mktemp)
 	archive=$(mktemp)
-	trap 'rm -f -- "$metadata" "$archive"' EXIT
-	if [[ -n $requested ]]; then
-		[[ $requested =~ ^server-v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]] || fail 'Release 标签必须为 server-v版本号。'
-		curl --fail --silent --show-error --location --proto '=https' "https://api.github.com/repos/stellasora-cafe/trekker-camp/releases/tags/$requested" -o "$metadata"
-	else
-		curl --fail --silent --show-error --location --proto '=https' 'https://api.github.com/repos/stellasora-cafe/trekker-camp/releases?per_page=100' -o "$metadata"
+	auth=$(mktemp)
+	runs=$(mktemp)
+	trap 'rm -f -- "$metadata" "$archive" "$auth" "$runs"' EXIT
+	if [[ -z $token && -s $config_dir/github-token ]]; then token=$(< "$config_dir/github-token"); fi
+	if [[ -z $token && -t 0 ]]; then
+		read -r -s -p 'GitHub PAT（主仓库 Actions: Read，素材仓 Contents: Read）：' token
+		printf '\n'
 	fi
-	tag=$(python3 - "$metadata" "$requested" <<'PY'
+	[[ $token =~ ^github_pat_[a-zA-Z0-9_]+$ ]] || fail '下载构建产物需要主仓库 Actions: Read 权限的细粒度 PAT，请通过 GH_TOKEN / GITHUB_TOKEN 提供。'
+	printf 'header = "Authorization: Bearer %s"\n' "$token" > "$auth"
+	if [[ -n $requested ]]; then
+		[[ $requested =~ ^[1-9][0-9]*$ ]] || fail '--build 需要 Actions 构建编号。'
+		curl --fail --silent --show-error --config "$auth" "https://api.github.com/repos/stellasora-cafe/trekker-camp/actions/runs/$requested" -o "$metadata"
+	else
+		curl --fail --silent --show-error --config "$auth" 'https://api.github.com/repos/stellasora-cafe/trekker-camp/actions/workflows/server-release.yml/runs?branch=master&status=success&per_page=100' -o "$metadata"
+	fi
+	python3 - "$metadata" "$requested" > "$runs" <<'PY'
 import json, re, sys
-releases = json.load(open(sys.argv[1]))
-if isinstance(releases, dict): releases = [releases]
-for release in releases:
-    tag = release.get('tag_name', '')
-    if re.fullmatch(r'server-v[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?', tag) and not release.get('draft') and (sys.argv[2] or not release.get('prerelease')):
-        name = 'camp-server-' + tag + '.tar.gz'
-        if any(a.get('name') == name for a in release.get('assets', [])):
-            print(tag)
-            break
-else: sys.exit('没有可安装的已发布服务端 Release。')
+payload = json.load(open(sys.argv[1]))
+for run in sorted(payload.get('workflow_runs', [payload]), key=lambda r: r.get('run_number', 0), reverse=True):
+    if sys.argv[2] and str(run.get('id')) != sys.argv[2]: continue
+    if (run.get('status') == 'completed' and run.get('conclusion') == 'success'
+            and run.get('head_branch') == 'master' and run.get('event') in ('push', 'workflow_dispatch')
+            and run.get('path') == '.github/workflows/server-release.yml'
+            and run.get('head_repository', {}).get('full_name') == 'stellasora-cafe/trekker-camp'
+            and isinstance(run.get('id'), int) and run['id'] > 0
+            and re.fullmatch('[a-f0-9]{40}', run.get('head_sha', ''))):
+        print(run['id'], run['head_sha'])
 PY
-	)
-	curl --fail --silent --show-error --location --proto '=https' "https://github.com/stellasora-cafe/trekker-camp/releases/download/$tag/camp-server-$tag.tar.gz" -o "$archive"
-	python3 - "$archive" "$destination" "$tag" <<'PY'
-import json, pathlib, re, sys, tarfile
+	while read -r run_id commit; do
+		curl --fail --silent --show-error --config "$auth" "https://api.github.com/repos/stellasora-cafe/trekker-camp/actions/runs/$run_id/artifacts?name=camp-server&per_page=100" -o "$metadata"
+		artifact_id=$(python3 - "$metadata" <<'PY'
+import json, sys
+items = [a for a in json.load(open(sys.argv[1])).get('artifacts', [])
+         if a.get('name') == 'camp-server' and a.get('expired') is False and isinstance(a.get('id'), int) and a['id'] > 0]
+if items: print(max(items, key=lambda a: a['id'])['id'])
+PY
+		)
+		if [[ -n $artifact_id ]]; then selected=$run_id; break; fi
+	done < "$runs"
+	[[ -n $selected ]] || fail '没有可下载的 master 成功构建产物；请检查 Actions 构建结果及产物保留期限。'
+	# curl strips Authorization when following the signed artifact URL to another host.
+	curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --config "$auth" "https://api.github.com/repos/stellasora-cafe/trekker-camp/actions/artifacts/$artifact_id/zip" -o "$archive"
+	python3 - "$archive" "$destination" "$selected" "$commit" <<'PY'
+import io, json, pathlib, re, sys, tarfile, zipfile
 allowed = {'RELEASE.json', 'compose.release.yml', 'compose.vps.yml', 'compose.assets.yml', 'compose.maintenance.yml', '.config/docker_example.yml', '.config/docker_example.env', 'scripts/deploy.sh', 'scripts/backup.sh', 'scripts/caddy/Dockerfile', 'scripts/caddy/cloudflare-proxies.caddy', 'scripts/caddy/camp-site.caddy'}
 root = pathlib.Path(sys.argv[2])
-with tarfile.open(sys.argv[1], 'r:gz') as archive:
+with zipfile.ZipFile(sys.argv[1]) as outer:
+    if outer.namelist() != ['camp-server.tar.gz'] or outer.infolist()[0].file_size > 8 * 1024 * 1024:
+        sys.exit('Actions 产物文件清单无效。')
+    bundle = outer.read('camp-server.tar.gz')
+with tarfile.open(fileobj=io.BytesIO(bundle), mode='r:gz') as archive:
     members = archive.getmembers()
     if len(members) != len(allowed) or {m.name for m in members} != allowed or any(not m.isfile() or m.size <= 0 or m.size > 4 * 1024 * 1024 for m in members):
-        sys.exit('Release 文件清单无效；未写入部署目录。')
+        sys.exit('部署产物文件清单无效；未写入部署目录。')
     release = json.load(archive.extractfile('RELEASE.json'))
-    if release.get('tag') != sys.argv[3] or not re.fullmatch('[a-f0-9]{40}', release.get('commit', '')):
-        sys.exit('Release 版本无效。')
+    if release.get('runId') != int(sys.argv[3]) or release.get('commit') != sys.argv[4]:
+        sys.exit('部署包与成功构建的编号或提交不一致。')
     for component in ('web', 'caddy'):
         expected = 'ghcr.io/stellasora-cafe/trekker-camp' + ('-caddy' if component == 'caddy' else '') + '@sha256:'
         if not re.fullmatch(re.escape(expected) + '[a-f0-9]{64}', release.get(component, '')):
-            sys.exit('Release 镜像必须固定到官方镜像摘要。')
+            sys.exit('部署镜像必须固定到官方镜像摘要。')
     expected = 'services:\n' + ''.join('  ' + key + ':\n    build: !reset null\n    image: ' + release[key] + '\n' for key in ('web', 'caddy'))
     if archive.extractfile('compose.release.yml').read().decode() != expected:
-        sys.exit('Release Compose 与镜像摘要不一致。')
+        sys.exit('部署 Compose 与镜像摘要不一致。')
     for member in members:
         path = root / member.name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -316,8 +346,8 @@ self_update() (
 	umask 077
 	download_dir=$(mktemp -d)
 	trap 'rm -rf -- "$download_dir"' EXIT
-	stage='下载已发布的 CLI'
-	download_release "$download_dir" "${requested_release:-}"
+	stage='下载最新成功构建的 CLI'
+	download_release "$download_dir" "${requested_build:-}"
 	revision=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["commit"])' "$download_dir/RELEASE.json")
 	install_cli "$download_dir/scripts" "$revision" "$prefix"
 	log "CLI 已更新：$revision"
@@ -327,7 +357,7 @@ prepare_release() {
 	local candidate
 	install -d -m 0755 "$camp_dir/.releases"
 	candidate=$(mktemp -d "$camp_dir/.releases/release-XXXXXX")
-	download_release "$candidate" "${requested_release:-}"
+	download_release "$candidate" "${requested_build:-}"
 	release_source=$candidate
 }
 
@@ -336,7 +366,7 @@ resolve_storage() {
 	release_source=''
 	if [[ -s $camp_dir/.config/server-release ]]; then
 		release_source=$(< "$camp_dir/.config/server-release")
-		[[ $release_source == "$camp_dir/.releases/"* && -f $release_source/RELEASE.json ]] || fail '已保存的 Release 目录无效。'
+		[[ $release_source == "$camp_dir/.releases/"* && -f $release_source/RELEASE.json ]] || fail '已保存的构建产物目录无效。'
 	fi
 	data_dir=$camp_dir
 	if [[ -f $saved ]]; then
@@ -425,7 +455,7 @@ prepare_auth() {
 		github_token=$(< "$config_dir/github-token")
 	fi
 	if [[ -z $github_token && -t 0 ]]; then
-		read -r -s -p 'GitHub 细粒度 PAT（私有素材仓库 Contents: Read-only，验证后保存）：' github_token
+		read -r -s -p 'GitHub 细粒度 PAT（主仓库 Actions: Read，素材仓 Contents: Read，验证后保存）：' github_token
 		printf '\n'
 	fi
 	[[ -n $github_token ]] || fail '尚未保存 GitHub PAT，请交互输入或通过 GH_TOKEN / GITHUB_TOKEN 提供。'
@@ -457,6 +487,35 @@ github_git() {
 	LC_ALL=C CAMP_GH_TOKEN="$github_token" GIT_ASKPASS="$auth_dir/askpass" GIT_TERMINAL_PROMPT=0 GIT_LFS_SKIP_SMUDGE=1 \
 		git -c credential.helper= "$@"
 }
+
+pull_release_images() (
+	local token=${ghcr_token:-} credentials username
+	set +x
+	umask 077
+	if [[ -z $token && -s $config_dir/ghcr-token ]]; then token=$(< "$config_dir/ghcr-token"); fi
+	if [[ -z $token && -t 0 ]]; then
+		read -r -s -p 'GHCR classic PAT（read:packages，拉取成功后保存）：' token
+		printf '\n'
+	fi
+	[[ $token =~ ^ghp_[a-zA-Z0-9]+$ ]] || fail '私有镜像需要 classic PAT（read:packages），请交互输入或通过 GHCR_TOKEN 提供；素材仓库的细粒度 PAT 不支持 GHCR。'
+	credentials=$(mktemp -d)
+	trap 'rm -rf -- "$credentials"' EXIT
+	printf 'header = "Authorization: Bearer %s"\n' "$token" > "$credentials/request"
+	if ! username=$(curl --fail --silent --show-error --config "$credentials/request" https://api.github.com/user | python3 -c 'import json,sys; print(json.load(sys.stdin)["login"])'); then
+		fail '镜像令牌验证失败，请检查 GHCR_TOKEN 的有效期及组织授权。'
+	fi
+	[[ $username =~ ^[a-zA-Z0-9-]+$ ]] || fail 'GitHub 返回了无效的镜像登录用户名。'
+	export DOCKER_CONFIG="$credentials/docker"
+	install -d -m 0700 "$DOCKER_CONFIG"
+	if ! printf '%s' "$token" | docker login ghcr.io --username "$username" --password-stdin >/dev/null; then
+		fail 'GHCR 登录失败，请检查 classic PAT 的 read:packages 权限及组织授权。'
+	fi
+	if ! compose pull web caddy; then
+		fail '私有镜像拉取失败，请检查令牌的 read:packages 权限、两个包的读取授权及网络连接；已有凭据保持不变。'
+	fi
+	printf '%s\n' "$token" > "$credentials/token"
+	install -m 0600 "$credentials/token" "$config_dir/ghcr-token"
+)
 
 prepare_cloudflare() {
 	if [[ -z $cloudflare_token && -t 0 ]]; then
@@ -502,7 +561,7 @@ check_deployment_source() {
 	for file in compose.vps.yml compose.assets.yml .config/docker_example.yml .config/docker_example.env \
 		scripts/deploy.sh scripts/backup.sh scripts/caddy/Dockerfile scripts/caddy/cloudflare-proxies.caddy scripts/caddy/camp-site.caddy compose.maintenance.yml; do
 		[[ -s ${release_source:-$camp_dir}/$file ]] ||
-			fail "Release 缺少部署文件：$file。"
+			fail "构建产物缺少部署文件：$file。"
 	done
 }
 
@@ -818,9 +877,9 @@ deploy() {
 	local action=$1 maintenance_upgrade=0 probe_path=/healthz
 	stage='配置 CDN 访客 IP 识别'
 	prepare_cdn
-	stage='准备 Release 镜像'
+	stage='准备 部署镜像'
 	compose config --quiet
-	if [[ -n ${release_source:-} ]]; then compose pull web caddy; else compose build web caddy; fi
+	if [[ -n ${release_source:-} ]]; then pull_release_images; else compose build web caddy; fi
 	check_application_runtime
 	if ! grep -Fq 'import /etc/caddy/camp-site.caddy' "$config_dir/Caddyfile"; then maintenance_upgrade=1; fi
 	upgrade_maintenance_config
@@ -909,10 +968,11 @@ main() {
 		camp_dir=$(< "$cli_dir/../deployment-dir")
 	fi
 	site_url=''
-	requested_release=''
+	requested_build=''
 	github_token=${GH_TOKEN:-${GITHUB_TOKEN:-}}
+	ghcr_token=${GHCR_TOKEN:-}
 	cloudflare_token=${CLOUDFLARE_API_TOKEN:-}
-	unset GH_TOKEN GITHUB_TOKEN CLOUDFLARE_API_TOKEN
+	unset GH_TOKEN GITHUB_TOKEN GHCR_TOKEN CLOUDFLARE_API_TOKEN
 	auth_dir='' backup_dir='' stage='初始化'
 	trap 'if [[ -n $auth_dir ]]; then rm -f -- "$auth_dir/askpass"; rmdir -- "$auth_dir"; fi' EXIT
 	trap 'printf "操作失败：%s。备份目录：%s\n" "$stage" "${backup_dir:-未创建}" >&2' ERR
@@ -921,9 +981,9 @@ main() {
 	while (($#)); do
 		option=$1
 		case "$option" in
-			--dir|--url|--data-dir|--release)
+			--dir|--url|--data-dir|--build)
 				if (($# < 2)) || [[ -z $2 || $2 == --* ]]; then fail "$option 缺少值。"; fi
-				case "$option" in --release) requested_release=$2 ;; --dir) camp_dir=$2 ;; --data-dir) requested_data_dir=$2 ;; --url) site_url=${2%/} ;; esac
+				case "$option" in --build) requested_build=$2 ;; --dir) camp_dir=$2 ;; --data-dir) requested_data_dir=$2 ;; --url) site_url=${2%/} ;; esac
 				shift 2 ;;
 			-h|--help) usage; return ;;
 			--version) cli_version; return ;;
@@ -1012,7 +1072,7 @@ main() {
 	fi
 	docker info >/dev/null
 	if [[ -e $assets_dir/.git ]]; then check_checkout "$assets_dir" https://github.com/stellasora-cafe/trekker-camp-assets.git; fi
-	stage='下载已发布的服务端 Release'
+	stage='下载最新成功的服务端构建'
 	prepare_release
 	stage='检查部署文件'
 	check_deployment_source
