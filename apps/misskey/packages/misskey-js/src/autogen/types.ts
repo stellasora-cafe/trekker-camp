@@ -5608,7 +5608,7 @@ export type components = {
             description: string | null;
             langs: string[];
             tosUrl: string | null;
-            /** @default https://github.com/misskey-dev/misskey */
+            /** @default https://github.com/stellasora-cafe/trekker-camp */
             repositoryUrl: string | null;
             /** @default https://github.com/misskey-dev/misskey/issues/new */
             feedbackUrl: string | null;
