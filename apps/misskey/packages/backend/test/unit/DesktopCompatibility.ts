@@ -25,7 +25,7 @@ import { AuthenticateService } from '@/server/api/AuthenticateService.js';
 
 const versionHeaders = { 'x-camp-desktop-version': '0.1.0', 'x-camp-host-api': '2' };
 const desktopHeaders = { ...versionHeaders, 'x-camp-client': 'desktop-v1' };
-const config = { version: '2026.11.0', maxFileSize: 1024 * 1024 } as Config;
+const config = { version: '2026.11.0', maxFileSize: 4 * 1024 * 1024 } as Config;
 
 describe('Desktop compatibility', () => {
 	it.each([
@@ -117,6 +117,66 @@ describe('Desktop business API gate', () => {
 			expect(response.json().error.code).toBe('CLIENT_UPDATE_REQUIRED');
 			expect(apiCalls.handleRequest).toHaveBeenCalledTimes(before);
 		}
+	});
+
+	it('preserves desktop identity, nested endpoint names, JSON bodies and query parameters', async () => {
+		const response = await fastify.inject({ method: 'POST', url: '/api/client/notes/create?source=desktop', headers: desktopHeaders, payload: { text: 'test' } });
+		expect(response.statusCode).toBe(200);
+		const [endpoint, request] = apiCalls.handleRequest.mock.calls.at(-1)!;
+		expect(endpoint.name).toBe('notes/create');
+		expect(request.url).toBe('/api/client/notes/create?source=desktop');
+		expect(request.body).toEqual({ text: 'test' });
+		expect(request.query).toEqual({ source: 'desktop' });
+	});
+
+	it('accepts desktop multipart files larger than the JSON body limit', async () => {
+		const content = 'x'.repeat(2 * 1024 * 1024);
+		apiCalls.handleMultipartRequest.mockImplementationOnce(async (endpoint, request, reply) => {
+			expect(endpoint.name).toBe('drive/files/create');
+			expect(request.url).toBe('/api/client/drive/files/create');
+			const file = await request.file();
+			expect(file?.filename).toBe('test.txt');
+			expect((await file!.toBuffer()).length).toBe(content.length);
+			reply.send({ uploaded: true });
+		});
+		const response = await fastify.inject({
+			method: 'POST', url: '/api/client/drive/files/create',
+			headers: { ...desktopHeaders, 'content-type': 'multipart/form-data; boundary=camp-test' },
+			payload: `--camp-test\r\nContent-Disposition: form-data; name="file"; filename="test.txt"\r\nContent-Type: text/plain\r\n\r\n${content}\r\n--camp-test--\r\n`,
+		});
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({ uploaded: true });
+	});
+
+	it('rejects desktop uploads beyond the configured file size', async () => {
+		apiCalls.handleMultipartRequest.mockImplementationOnce(async (_endpoint, request, reply) => {
+			const file = await request.file();
+			await file!.toBuffer();
+			reply.send({ uploaded: true });
+		});
+		const response = await fastify.inject({
+			method: 'POST', url: '/api/client/drive/files/create',
+			headers: { ...desktopHeaders, 'content-type': 'multipart/form-data; boundary=camp-test' },
+			payload: `--camp-test\r\nContent-Disposition: form-data; name="file"; filename="test.txt"\r\n\r\n${'x'.repeat(config.maxFileSize + 1)}\r\n--camp-test--\r\n`,
+		});
+		expect(response.statusCode).toBe(413);
+	});
+
+	it('preserves allowed GETs, method rejection, body limits and unknown endpoint errors', async () => {
+		expect((await fastify.inject({ url: '/api/client/charts/users', headers: desktopHeaders })).statusCode).toBe(200);
+		expect((await fastify.inject({ url: '/api/client/notes/create', headers: desktopHeaders })).statusCode).toBe(405);
+		const unknown = await fastify.inject({ method: 'POST', url: '/api/client/missing', headers: desktopHeaders, payload: {} });
+		expect(unknown.statusCode).toBe(404);
+		expect(unknown.json().error.code).toBe('UNKNOWN_API_ENDPOINT');
+		const oversized = await fastify.inject({ method: 'POST', url: '/api/client/notes/create', headers: desktopHeaders, payload: { text: 'x'.repeat(1024 * 1024) } });
+		expect(oversized.statusCode).toBe(413);
+		const cap = await fastify.inject({ method: 'POST', url: '/api/client/cap/redeem', headers: desktopHeaders, payload: { token: 'x'.repeat(65536) } });
+		expect(cap.statusCode).toBe(413);
+	});
+
+	it('keeps CORS preflight available without desktop credentials', async () => {
+		const response = await fastify.inject({ method: 'OPTIONS', url: '/api/client/i', headers: { origin: 'https://camp.example', 'access-control-request-method': 'POST' } });
+		expect(response.statusCode).toBe(204);
 	});
 
 	it.each([

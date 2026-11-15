@@ -22,6 +22,13 @@ if (!output.startsWith(path.join(root, 'apps/misskey/built') + path.sep)) throw 
 await fs.rm(output, { recursive: true, force: true });
 await fs.mkdir(output, { recursive: true });
 
+// Desktop includes local syntax grammars and produces a different bundle graph.
+// Preserve the web build's diagnostics when both builds run in the same job.
+for (const variable of ['FRONTEND_BUNDLE_VISUALIZER_FILE', 'FRONTEND_BUNDLE_VISUALIZER_HTML_FILE']) {
+	const filename = process.env[variable];
+	if (filename) process.env[variable] = path.join(path.dirname(filename), `desktop-${path.basename(filename)}`);
+}
+
 const loaded = await loadConfigFromFile({ command: 'build', mode: 'production' }, path.join(frontend, 'vite.config.ts'), frontend);
 if (!loaded) throw new Error('Frontend Vite configuration not found');
 const config = loaded.config;

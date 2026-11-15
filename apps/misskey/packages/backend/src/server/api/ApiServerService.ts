@@ -22,7 +22,7 @@ import { ApiCallService } from './ApiCallService.js';
 import { SignupApiService } from './SignupApiService.js';
 import { clientSessionErrors } from './client-session-errors.js';
 import { SigninApiService } from './SigninApiService.js';
-import type { FastifyInstance, FastifyPluginOptions } from 'fastify';
+import type { FastifyInstance, FastifyPluginOptions, FastifyRequest, FastifyReply } from 'fastify';
 
 @Injectable()
 export class ApiServerService {
@@ -85,6 +85,41 @@ export class ApiServerService {
 			done();
 		});
 
+		type ApiRequest = { Body: Record<string, unknown>; Querystring: Record<string, unknown> };
+		const handlers = new Map<string, (request: FastifyRequest<ApiRequest>, reply: FastifyReply) => Promise<FastifyReply>>();
+		for (const endpoint of endpoints) {
+			const ep = {
+				name: endpoint.name,
+				meta: endpoint.meta,
+				params: endpoint.params,
+				exec: this.moduleRef.get('ep:' + endpoint.name, { strict: false }).exec,
+			};
+			const handler = async (request: FastifyRequest<ApiRequest>, reply: FastifyReply) => {
+				if (request.method === 'GET' && !ep.meta.allowGet) return reply.code(405).send();
+				if (ep.meta.requireFile) {
+					await this.apiCallService.handleMultipartRequest(ep, request, reply);
+				} else {
+					await this.apiCallService.handleRequest(ep, request, reply);
+				}
+				return reply;
+			};
+			handlers.set(ep.name, handler);
+			fastify.all<ApiRequest>('/' + ep.name, { bodyLimit: 1024 * 1024 }, handler);
+		}
+
+		// Share endpoint handlers without duplicating the full Fastify route tree.
+		// Keep the original URL so protocol, session and version checks remain intact.
+		fastify.all<ApiRequest & { Params: { '*': string } }>('/client/*', { bodyLimit: 1024 * 1024 }, async (request, reply) => {
+			const handler = handlers.get(request.params['*']);
+			if (!handler) {
+				return reply.code(404).send({ error: {
+					message: 'Unknown API endpoint.', code: 'UNKNOWN_API_ENDPOINT',
+					id: '2ca3b769-540a-4f08-9dd5-b5a825b6d0f1', kind: 'client',
+				} });
+			}
+			return handler(request, reply);
+		});
+
 		for (const apiPrefix of ['', '/client']) {
 			fastify.post(apiPrefix + '/cap/challenge', async (request, reply) => {
 				const limited = await this.rateLimiterService.limit({ key: 'cap-challenge', duration: 60000, max: 30 }, request.ip);
@@ -99,49 +134,6 @@ export class ApiServerService {
 				}
 				return this.captchaService.capRedeem(request.body);
 			});
-
-			for (const endpoint of endpoints) {
-				const ep = {
-					name: endpoint.name,
-					meta: endpoint.meta,
-					params: endpoint.params,
-					exec: this.moduleRef.get('ep:' + endpoint.name, { strict: false }).exec,
-				};
-
-				if (endpoint.meta.requireFile) {
-					fastify.all<{
-						Params: { endpoint: string; },
-						Body: Record<string, unknown>,
-						Querystring: Record<string, unknown>,
-					}>(apiPrefix + '/' + endpoint.name, async (request, reply) => {
-						if (request.method === 'GET' && !endpoint.meta.allowGet) {
-							reply.code(405);
-							reply.send();
-							return;
-						}
-
-						// Await so that any error can automatically be translated to HTTP 500
-						await this.apiCallService.handleMultipartRequest(ep, request, reply);
-						return reply;
-					});
-				} else {
-					fastify.all<{
-						Params: { endpoint: string; },
-						Body: Record<string, unknown>,
-						Querystring: Record<string, unknown>,
-					}>(apiPrefix + '/' + endpoint.name, { bodyLimit: 1024 * 1024 }, async (request, reply) => {
-						if (request.method === 'GET' && !endpoint.meta.allowGet) {
-							reply.code(405);
-							reply.send();
-							return;
-						}
-
-						// Await so that any error can automatically be translated to HTTP 500
-						await this.apiCallService.handleRequest(ep, request, reply);
-						return reply;
-					});
-				}
-			}
 
 			fastify.post<{
 				Body: {
