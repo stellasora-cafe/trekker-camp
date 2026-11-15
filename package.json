@@ -4,7 +4,7 @@
 	"codename": "nasubi",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/HePudding/trekker-camp.git"
+		"url": "https://github.com/stellasora-cafe/trekker-camp.git"
 	},
 	"packageManager": "pnpm@12.17.0",
 	"workspaces": [
@@ -76,6 +76,7 @@
 		"@typescript/native": "npm:typescript@7.0.2",
 		"cross-env": "10.1.0",
 		"eslint": "9.39.5",
+		"fflate": "0.8.3",
 		"globals": "17.14.0",
 		"ncp": "2.0.0",
 		"start-server-and-test": "3.0.13",

@@ -4,15 +4,16 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<div v-if="show" ref="el" :class="[$style.root]">
-	<div :class="[$style.upper, { [$style.slim]: narrow, [$style.thin]: thin_ }]">
+<div v-if="show" ref="el" :class="[$style.root, { [$style.desktop]: customChrome }]">
+	<div :class="[$style.upper, { [$style.slim]: narrow, [$style.thin]: thin_, '_campWindowHeader': !thin_ }]" :data-camp-window-drag="!thin_ ? '' : undefined">
+		<button v-if="showBack" v-tooltip.noDelay="i18n.ts.goBack" type="button" class="_button" :class="[$style.button, $style.backButton]" :aria-label="i18n.ts.goBack" @click.stop="back" @touchstart="preventDrag"><i class="ti ti-arrow-left"></i></button>
 		<div v-if="!thin_ && (narrow || deviceKind === 'smartphone') && props.displayMyAvatar && $i" class="_button" @click="openAccountMenu">
 			<MkAvatar :class="$style.avatar" :user="$i"/>
 		</div>
-		<div v-else-if="!thin_ && narrow && !hideTitle" :class="$style.buttons"></div>
+		<div v-else-if="!showBack && !thin_ && narrow && !hideTitle" :class="$style.buttons"></div>
 
 		<template v-if="pageMetadata">
-			<div v-if="!hideTitle" :class="$style.titleContainer" @click="top">
+			<div v-if="!hideTitle" :class="$style.titleContainer" data-camp-no-drag @click="top">
 				<div v-if="pageMetadata.avatar" :class="$style.titleAvatarContainer">
 					<MkAvatar :class="$style.titleAvatar" :user="pageMetadata.avatar" indicator/>
 				</div>
@@ -58,14 +59,29 @@ export type PageHeaderProps = {
 </script>
 
 <script lang="ts" setup>
-import { onMounted, onUnmounted, ref, inject, useTemplateRef, computed } from 'vue';
+import { onMounted, onUnmounted, ref, inject, useTemplateRef, computed, unref, watch } from 'vue';
 import { scrollToTop } from '@@/js/scroll.js';
 import XTabs from './MkPageHeader.tabs.vue';
+import type { MaybeRef } from 'vue';
+import type { Router } from '@/router.js';
 import { getAccountMenu } from '@/accounts.js';
 import { deviceKind } from '@/utility/device-kind.js';
 import { $i } from '@/i.js';
 import { DI } from '@/di.js';
 import * as os from '@/os.js';
+import { i18n } from '@/i18n.js';
+import { useRouter, goBack, getRouterPageBackState } from '@/router.js';
+import { useDesktopControlsInset } from '@/composables/use-desktop-controls-inset.js';
+import { hasDesktopWindowChrome } from '@/utility/desktop-window.js';
+
+const router = useRouter();
+const customChrome = hasDesktopWindowChrome();
+const backHandledByRouter = inject<MaybeRef<Router | null>>('pageHeaderBackRouter', null);
+const showBack = computed(() => unref(backHandledByRouter) !== router && getRouterPageBackState(router).visible);
+
+function back(): void {
+	goBack(router);
+}
 
 const props = withDefaults(defineProps<PageHeaderProps>(), {
 	tabs: () => ([] as Tab[]),
@@ -83,11 +99,15 @@ const hideTitle = computed(() => inject('shouldOmitHeaderTitle', false) || props
 const thin_ = props.thin || inject('shouldHeaderThin', false);
 
 const el = useTemplateRef('el');
+const controlsInset = useDesktopControlsInset(el);
 const narrow = ref(false);
+watch(controlsInset, () => {
+	if (el.value?.parentElement) narrow.value = el.value.parentElement.offsetWidth - controlsInset.value < 500;
+});
 const hasTabs = computed(() => props.tabs.length > 0);
 const hasActions = computed(() => props.actions && props.actions.length > 0);
 const show = computed(() => {
-	return !hideTitle.value || hasTabs.value || hasActions.value;
+	return (customChrome && !thin_) || showBack.value || !hideTitle.value || hasTabs.value || hasActions.value;
 });
 
 const preventDrag = (ev: TouchEvent) => {
@@ -116,10 +136,10 @@ let ro: ResizeObserver | null;
 
 onMounted(() => {
 	if (el.value && el.value.parentElement) {
-		narrow.value = el.value.parentElement.offsetWidth < 500;
+		narrow.value = el.value.parentElement.offsetWidth - controlsInset.value < 500;
 		ro = new ResizeObserver((entries, observer) => {
 			if (el.value && el.value.parentElement && window.document.body.contains(el.value as HTMLElement)) {
-				narrow.value = el.value.parentElement.offsetWidth < 500;
+				narrow.value = el.value.parentElement.offsetWidth - controlsInset.value < 500;
 			}
 		});
 		ro.observe(el.value.parentElement as HTMLElement);
@@ -147,6 +167,11 @@ onUnmounted(() => {
 	}
 }
 
+.root.desktop {
+	border-bottom: 0;
+	background: var(--camp-window-header-bg);
+}
+
 .upper,
 .lower {
 	width: 100%;
@@ -160,6 +185,8 @@ onUnmounted(() => {
 	gap: var(--margin);
 	align-items: center;
 	height: var(--height);
+	box-sizing: border-box;
+	padding-right: v-bind("controlsInset + 'px'");
 
 	.tabs:first-child,
 	&:not(.slim) > :not(.titleContainer) ~ .tabs {
@@ -236,12 +263,16 @@ onUnmounted(() => {
 	}
 }
 
-.fullButton {
-	& + .fullButton {
-		margin-left: 12px;
-	}
+.backButton {
+ flex-shrink: 0;
+ width: var(--height);
 }
 
+.fullButton {
+ & + .fullButton {
+  margin-left: 12px;
+ }
+}
 .titleContainer {
 	display: flex;
 	align-items: center;

@@ -110,6 +110,10 @@ export const ROUTE_DEF = [{
 		name: 'email',
 		component: page(() => import('@/pages/settings/email.vue')),
 	}, {
+		path: '/devices',
+		name: 'devices',
+		component: page(() => import('@/pages/settings/devices.vue')),
+	}, {
 		path: '/security',
 		name: 'security',
 		component: page(() => import('@/pages/settings/security.vue')),
@@ -223,6 +227,12 @@ export const ROUTE_DEF = [{
 	path: '/about-misskey',
 	component: page(() => import('@/pages/about-misskey.vue')),
 }, {
+	path: '/about-camp',
+	component: page(() => import('@/pages/about-camp.vue')),
+}, {
+	path: '/about-camp/misskey',
+	component: page(() => import('@/pages/about-misskey.vue')),
+}, {
 	path: '/invite',
 	name: 'invite',
 	component: page(() => import('@/pages/invite.vue')),
@@ -286,6 +296,17 @@ export const ROUTE_DEF = [{
 }, {
 	path: '/auth/:token',
 	component: page(() => import('@/pages/auth.vue')),
+}, {
+	path: '/desktop-auth',
+	component: page(() => import('@/pages/desktop-auth.vue')),
+	query: {
+		mode: 'mode',
+		username: 'username',
+	},
+}, {
+	path: '/client-auth/:requestId',
+	name: 'client-auth',
+	component: page(() => import('@/pages/client-auth.vue')),
 }, {
 	path: '/miauth/:session',
 	component: page(() => import('@/pages/miauth.vue')),
@@ -475,6 +496,10 @@ export const ROUTE_DEF = [{
 		path: '/object-storage',
 		name: 'object-storage',
 		component: page(() => import('@/pages/admin/object-storage.vue')),
+	}, {
+		path: '/devices',
+		name: 'devices',
+		component: page(() => import('@/pages/settings/devices.vue')),
 	}, {
 		path: '/security',
 		name: 'security',

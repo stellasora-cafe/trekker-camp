@@ -41,7 +41,8 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store,sharing=locked \
 
 COPY --link . ./
 
-RUN pnpm build
+RUN pnpm build \
+	&& node --input-type=module -e "import { buildTarball } from './scripts/tarball.mjs'; await buildTarball();"
 RUN rm -rf .git/
 
 # build native dependencies for target platform
@@ -106,10 +107,25 @@ COPY --chown=misskey:misskey --from=native-builder /misskey/apps/misskey/package
 COPY --chown=misskey:misskey --from=native-builder /misskey/apps/misskey/packages/misskey-bubble-game/built ./apps/misskey/packages/misskey-bubble-game/built
 COPY --chown=misskey:misskey --from=native-builder /misskey/apps/misskey/packages/backend/built ./apps/misskey/packages/backend/built
 COPY --chown=misskey:misskey --from=native-builder /misskey/apps/misskey/packages/i18n/built ./apps/misskey/packages/i18n/built
-COPY --chown=misskey:misskey . ./
+# Runtime files only. The complete corresponding source is in built/tarball.
+COPY --chown=misskey:misskey ["package.json", "pnpm-workspace.yaml", ".node-version", "healthcheck.sh", "LICENSE", "./"]
+COPY --chown=misskey:misskey ["apps/misskey/package.json", "./apps/misskey/"]
+COPY --chown=misskey:misskey ["apps/misskey/scripts/start.mjs", "./apps/misskey/scripts/"]
+COPY --chown=misskey:misskey ["apps/misskey/packages/backend/package.json", "apps/misskey/packages/backend/ormconfig.js", "./apps/misskey/packages/backend/"]
+COPY --chown=misskey:misskey apps/misskey/packages/backend/scripts ./apps/misskey/packages/backend/scripts
+COPY --chown=misskey:misskey apps/misskey/packages/backend/migration ./apps/misskey/packages/backend/migration
+COPY --chown=misskey:misskey apps/misskey/packages/backend/assets ./apps/misskey/packages/backend/assets
+COPY --chown=misskey:misskey apps/misskey/packages/frontend/assets ./apps/misskey/packages/frontend/assets
+COPY --chown=misskey:misskey ["apps/misskey/packages/misskey-js/package.json", "./apps/misskey/packages/misskey-js/"]
+COPY --chown=misskey:misskey ["apps/misskey/packages/misskey-reversi/package.json", "./apps/misskey/packages/misskey-reversi/"]
+COPY --chown=misskey:misskey ["apps/misskey/packages/misskey-bubble-game/package.json", "./apps/misskey/packages/misskey-bubble-game/"]
+COPY --chown=misskey:misskey ["apps/misskey/packages/i18n/package.json", "./apps/misskey/packages/i18n/"]
 
 ENV LD_PRELOAD=/usr/local/lib/libjemalloc.so
 ENV NODE_ENV=production
+# All runtime dependencies and pnpm are installed in this image.
+ENV PNPM_CONFIG_MANAGE_PACKAGE_MANAGER_VERSIONS=false
+ENV PNPM_CONFIG_PM_ON_FAIL=ignore
 HEALTHCHECK --interval=5s --retries=20 CMD ["/bin/bash", "/misskey/healthcheck.sh"]
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "apps/misskey/scripts/start.mjs", "--migrate"]

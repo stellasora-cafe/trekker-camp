@@ -4,6 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
+<MkPageHeader v-if="file == null"/>
 <MkSuspense v-slot="{ result }" :p="_fetch_" @resolved="(result) => file = result.file">
 	<XRoot v-if="result.file != null && result.info != null" :file="result.file" :info="result.info"/>
 </MkSuspense>

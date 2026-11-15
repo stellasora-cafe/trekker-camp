@@ -4,40 +4,42 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<div class="_spacer" style="--MI_SPACER-w: 1000px;">
-	<div :class="$style.root">
-		<MkFoldableSection class="item">
-			<template #header>Stats</template>
-			<XStats/>
-		</MkFoldableSection>
+<PageWithHeader>
+	<div class="_spacer" style="--MI_SPACER-w: 1000px;">
+		<div :class="$style.root">
+			<MkFoldableSection class="item">
+				<template #header>Stats</template>
+				<XStats/>
+			</MkFoldableSection>
 
-		<MkFoldableSection class="item">
-			<template #header>Active users</template>
-			<XActiveUsers/>
-		</MkFoldableSection>
+			<MkFoldableSection class="item">
+				<template #header>Active users</template>
+				<XActiveUsers/>
+			</MkFoldableSection>
 
-		<MkFoldableSection class="item">
-			<template #header>Heatmap</template>
-			<XHeatmap/>
-		</MkFoldableSection>
+			<MkFoldableSection class="item">
+				<template #header>Heatmap</template>
+				<XHeatmap/>
+			</MkFoldableSection>
 
-		<MkFoldableSection class="item">
-			<template #header>Retention rate</template>
-			<XRetention/>
-		</MkFoldableSection>
+			<MkFoldableSection class="item">
+				<template #header>Retention rate</template>
+				<XRetention/>
+			</MkFoldableSection>
 
-		<MkFoldableSection class="item">
-			<template #header>Moderators</template>
-			<XModerators/>
-		</MkFoldableSection>
+			<MkFoldableSection class="item">
+				<template #header>Moderators</template>
+				<XModerators/>
+			</MkFoldableSection>
 
-		<MkFoldableSection class="item">
-			<template #header>New users</template>
-			<XUsers/>
-		</MkFoldableSection>
+			<MkFoldableSection class="item">
+				<template #header>New users</template>
+				<XUsers/>
+			</MkFoldableSection>
 
+		</div>
 	</div>
-</div>
+</PageWithHeader>
 </template>
 
 <script lang="ts" setup>

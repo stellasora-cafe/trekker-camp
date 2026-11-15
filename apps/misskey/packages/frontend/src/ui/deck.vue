@@ -5,12 +5,12 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <template>
 <div :class="[$style.root]">
-	<XTitlebar v-if="prefer.r.showTitlebar.value" style="flex-shrink: 0;"/>
+	<XTitlebar v-if="showTitlebar" style="flex-shrink: 0;"/>
 
 	<div :class="$style.nonTitlebarArea">
 		<XSidebar v-if="!isMobile && prefer.r['deck.navbarPosition'].value === 'left'"/>
 
-		<div :class="[$style.main, { [$style.withWallpaper]: withWallpaper, [$style.withSidebarAndTitlebar]: !isMobile && prefer.r['deck.navbarPosition'].value === 'left' && prefer.r.showTitlebar.value }]" :style="{ backgroundImage: prefer.s['deck.wallpaper'] != null ? `url(${ prefer.s['deck.wallpaper'] })` : '' }">
+		<div :class="[$style.main, { [$style.withWallpaper]: withWallpaper, [$style.withSidebarAndTitlebar]: !isMobile && prefer.r['deck.navbarPosition'].value === 'left' && showTitlebar }]" :style="{ backgroundImage: prefer.s['deck.wallpaper'] != null ? `url(${ prefer.s['deck.wallpaper'] })` : '' }">
 			<XNavbarH v-if="!isMobile && prefer.r['deck.navbarPosition'].value === 'top'" :acrylic="withWallpaper"/>
 
 			<XReloadSuggestion v-if="shouldSuggestReload"/>
@@ -49,7 +49,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					</div>
 				</div>
 
-				<div v-if="prefer.r['deck.menuPosition'].value === 'right'" :class="$style.sideMenu">
+				<div v-if="!customChrome && prefer.r['deck.menuPosition'].value === 'right'" :class="$style.sideMenu">
 					<div :class="$style.sideMenuTop">
 						<button ref="swicthProfileButtonEl" v-tooltip.noDelay.left="`${i18n.ts._deck.profile}: ${prefer.s['deck.profile']}`" :class="$style.sideMenuButton" class="_button" @click="switchProfileMenu"><i class="ti ti-caret-down"></i></button>
 						<button v-tooltip.noDelay.left="i18n.ts._deck.deleteProfile" :class="$style.sideMenuButton" class="_button" @click="deleteProfile"><i class="ti ti-trash"></i></button>
@@ -63,7 +63,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				</div>
 			</div>
 
-			<div v-if="prefer.r['deck.menuPosition'].value === 'bottom'" :class="$style.bottomMenu">
+			<div v-if="customChrome || prefer.r['deck.menuPosition'].value === 'bottom'" :class="[$style.bottomMenu, { [$style.desktopTopToolbar]: desktopTopToolbar, '_campWindowHeader': desktopTopToolbar }]" :data-camp-window-drag="desktopTopToolbar ? '' : undefined">
 				<div :class="$style.bottomMenuLeft">
 					<button ref="swicthProfileButtonEl" v-tooltip.noDelay.top="`${i18n.ts._deck.profile}: ${prefer.s['deck.profile']}`" :class="$style.bottomMenuButton" class="_button" @click="switchProfileMenu"><i class="ti ti-caret-down"></i></button>
 					<button v-tooltip.noDelay.top="i18n.ts._deck.deleteProfile" :class="$style.bottomMenuButton" class="_button" @click="deleteProfile"><i class="ti ti-trash"></i></button>
@@ -87,7 +87,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { defineAsyncComponent, ref, useTemplateRef } from 'vue';
+import { computed, defineAsyncComponent, provide, ref, useTemplateRef } from 'vue';
 import XCommon from './_common_/common.vue';
 import XEmailVerificationBanner from './_common_/email-verification-banner.vue';
 import { genId } from '@/utility/id.js';
@@ -95,6 +95,7 @@ import XSidebar from '@/ui/_common_/navbar.vue';
 import XNavbarH from '@/ui/_common_/navbar-h.vue';
 import XMobileFooterMenu from '@/ui/_common_/mobile-footer-menu.vue';
 import XTitlebar from '@/ui/_common_/titlebar.vue';
+import { hasDesktopWindowChrome } from '@/utility/desktop-window.js';
 import XPreferenceRestore from '@/ui/_common_/PreferenceRestore.vue';
 import XReloadSuggestion from '@/ui/_common_/ReloadSuggestion.vue';
 import XThemePreviewing from '@/ui/_common_/ThemePreviewing.vue';
@@ -128,6 +129,9 @@ import { closeTip } from '@/tips.js';
 const XStatusBars = defineAsyncComponent(() => import('@/ui/_common_/statusbars.vue'));
 const XAnnouncements = defineAsyncComponent(() => import('@/ui/_common_/announcements.vue'));
 
+const showTitlebar = computed(() => prefer.r.showTitlebar.value && !hasDesktopWindowChrome());
+provide('pageHeaderBackRouter', computed(() => showTitlebar.value ? mainRouter : null));
+
 const columnComponents = {
 	main: XMainColumn,
 	widgets: XWidgetsColumn,
@@ -154,6 +158,8 @@ mainRouter.navHook = (path, flag): boolean => {
 };
 
 const isMobile = ref(window.innerWidth <= 500);
+const customChrome = hasDesktopWindowChrome();
+const desktopTopToolbar = computed(() => customChrome && (isMobile.value || prefer.r['deck.navbarPosition'].value !== 'top'));
 window.addEventListener('resize', () => {
 	isMobile.value = window.innerWidth <= 500;
 });
@@ -389,6 +395,11 @@ window.document.documentElement.style.scrollBehavior = 'auto';
 	display: inline-block;
 	height: 100%;
 	aspect-ratio: 1;
+}
+
+.desktopTopToolbar {
+	order: -1;
+	padding-right: var(--camp-window-controls-width, 132px);
 }
 
 .bottomMenuLeft {

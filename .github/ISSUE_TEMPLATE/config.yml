@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
   - name: 旅人营地维护说明
-    url: https://github.com/HePudding/trekker-camp/blob/master/DEVELOPMENT.md
+    url: https://github.com/stellasora-cafe/trekker-camp/blob/master/DEVELOPMENT.md
     about: 本仓库由团队维护，Issue 用于记录本站问题和已确认任务。
   - name: 安全问题报告方式
-    url: https://github.com/HePudding/trekker-camp/blob/master/SECURITY.md
+    url: https://github.com/stellasora-cafe/trekker-camp/blob/master/SECURITY.md
     about: 安全问题请私下联系营地维护团队。

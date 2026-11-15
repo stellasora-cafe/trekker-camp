@@ -61,6 +61,7 @@ import {
 	MiReversiGame,
 	MiRole,
 	MiRoleAssignment,
+	MiClientSession,
 	MiSignin,
 	MiSwSubscription,
 	MiSystemAccount,
@@ -87,6 +88,12 @@ import {
 } from './_.js';
 import type { Provider } from '@nestjs/common';
 import type { DataSource } from 'typeorm';
+
+const $clientSessionsRepository: Provider = {
+	provide: DI.clientSessionsRepository,
+	useFactory: (db: DataSource) => db.getRepository(MiClientSession).extend(miRepository as MiRepository<MiClientSession>),
+	inject: [DI.db],
+};
 
 const $usersRepository: Provider = {
 	provide: DI.usersRepository,
@@ -588,6 +595,7 @@ const $reversiGamesRepository: Provider = {
 		$registrationTicketsRepository,
 		$authSessionsRepository,
 		$accessTokensRepository,
+		$clientSessionsRepository,
 		$signinsRepository,
 		$pagesRepository,
 		$pageLikesRepository,
@@ -666,6 +674,7 @@ const $reversiGamesRepository: Provider = {
 		$registrationTicketsRepository,
 		$authSessionsRepository,
 		$accessTokensRepository,
+		$clientSessionsRepository,
 		$signinsRepository,
 		$pagesRepository,
 		$pageLikesRepository,

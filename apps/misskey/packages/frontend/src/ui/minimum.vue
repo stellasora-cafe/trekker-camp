@@ -5,7 +5,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <template>
 <div :class="$style.root">
-	<XEmailVerificationBanner/>
+	<div v-if="customChrome && isClientAuthorization" class="_campWindowHeader" data-camp-window-drag></div>
+	<XEmailVerificationBanner v-if="!isClientAuthorization"/>
 	<RouterView/>
 
 	<XCommon/>
@@ -21,8 +22,11 @@ import type { PageMetadata } from '@/page.js';
 import { provideMetadataReceiver, provideReactiveMetadata } from '@/page.js';
 import { mainRouter } from '@/router.js';
 import { DI } from '@/di.js';
+import { hasDesktopWindowChrome } from '@/utility/desktop-window.js';
 
 const isRoot = computed(() => mainRouter.currentRoute.value.name === 'index');
+const customChrome = hasDesktopWindowChrome();
+const isClientAuthorization = computed(() => mainRouter.currentRoute.value.name === 'client-auth');
 
 const pageMetadata = ref<null | PageMetadata>(null);
 

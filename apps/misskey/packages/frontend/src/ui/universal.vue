@@ -5,12 +5,12 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <template>
 <div :class="[$style.root, { '_forceShrinkSpacer': deviceKind === 'smartphone' }]">
-	<XTitlebar v-if="prefer.r.showTitlebar.value" style="flex-shrink: 0;"/>
+	<XTitlebar v-if="showTitlebar" style="flex-shrink: 0;"/>
 
 	<div :class="$style.nonTitlebarArea">
 		<XSidebar v-if="!isMobile" :class="$style.sidebar" :showWidgetButton="!showWidgetsSide" @widgetButtonClick="widgetsShowing = true"/>
 
-		<div :class="[$style.contents, !isMobile && prefer.r.showTitlebar.value ? $style.withSidebarAndTitlebar : null]" @contextmenu.stop="onContextmenu">
+		<div :class="[$style.contents, !isMobile && showTitlebar ? $style.withSidebarAndTitlebar : null]" @contextmenu.stop="onContextmenu">
 			<div>
 				<XReloadSuggestion v-if="shouldSuggestReload"/>
 				<XPreferenceRestore v-if="shouldSuggestRestoreBackup"/>
@@ -25,7 +25,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</div>
 
 		<div v-if="showWidgetsSide && !pageMetadata?.needWideArea" :class="$style.widgets">
-			<XWidgets/>
+			<div v-if="customChrome" class="_campWindowHeader" data-camp-window-drag></div>
+			<div :class="$style.widgetsContent"><XWidgets/></div>
 		</div>
 	</div>
 
@@ -58,12 +59,15 @@ import { prefer } from '@/preferences.js';
 import { shouldSuggestRestoreBackup } from '@/preferences/utility.js';
 import { DI } from '@/di.js';
 import { shouldSuggestReload } from '@/utility/reload-suggest.js';
+import { hasDesktopWindowChrome } from '@/utility/desktop-window.js';
 
 const XWidgets = defineAsyncComponent(() => import('./_common_/widgets.vue'));
 const XStatusBars = defineAsyncComponent(() => import('@/ui/_common_/statusbars.vue'));
 const XAnnouncements = defineAsyncComponent(() => import('@/ui/_common_/announcements.vue'));
 
 const isRoot = computed(() => mainRouter.currentRoute.value.name === 'index');
+const customChrome = hasDesktopWindowChrome();
+const showTitlebar = computed(() => prefer.r.showTitlebar.value && !hasDesktopWindowChrome());
 
 const DESKTOP_THRESHOLD = 1100;
 const MOBILE_THRESHOLD = 500;
@@ -80,6 +84,7 @@ const pageMetadata = ref<null | PageMetadata>(null);
 const widgetsShowing = ref(false);
 
 provide(DI.router, mainRouter);
+provide('pageHeaderBackRouter', computed(() => showTitlebar.value ? mainRouter : null));
 provideMetadataReceiver((metadataGetter) => {
 	const info = metadataGetter();
 	pageMetadata.value = info;
@@ -174,16 +179,24 @@ $widgets-hide-threshold: 1090px;
 }
 
 .widgets {
+	display: flex;
+	flex-direction: column;
 	width: 350px;
 	height: 100%;
 	box-sizing: border-box;
-	overflow: auto;
-	padding: var(--MI-margin) var(--MI-margin) calc(var(--MI-margin) + env(safe-area-inset-bottom, 0px));
+	overflow: hidden;
 	border-left: solid 0.5px var(--MI_THEME-divider);
 	background: var(--MI_THEME-bg);
 
 	@media (max-width: $widgets-hide-threshold) {
 		display: none;
 	}
+}
+
+.widgetsContent {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+	padding: var(--MI-margin) var(--MI-margin) calc(var(--MI-margin) + env(safe-area-inset-bottom, 0px));
 }
 </style>

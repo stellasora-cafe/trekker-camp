@@ -8,10 +8,13 @@ import { Inject, Injectable } from '@nestjs/common';
 import * as Redis from 'ioredis';
 import * as WebSocket from 'ws';
 import { DI } from '@/di-symbols.js';
+import type { Config } from '@/config.js';
+import { desktopUpdateRequired } from '../desktop-compatibility.js';
 import type { MiAccessToken } from '@/models/_.js';
 import { bindThis } from '@/decorators.js';
 import type { MiLocalUser } from '@/models/User.js';
 import { UserService } from '@/core/UserService.js';
+import { ClientSessionService } from '@/core/ClientSessionService.js';
 import { AuthenticateService, AuthenticationError } from './AuthenticateService.js';
 import MainStreamConnection, { ConnectionRequest } from './stream/Connection.js';
 import type * as http from 'node:http';
@@ -30,7 +33,10 @@ export class StreamingApiServerService {
 
 		private moduleRef: ModuleRef,
 		private authenticateService: AuthenticateService,
+		private clientSessionService: ClientSessionService,
 		private usersService: UserService,
+		@Inject(DI.config)
+		private config: Config,
 	) {
 	}
 
@@ -49,10 +55,27 @@ export class StreamingApiServerService {
 				return;
 			}
 
-			const q = new URL(request.url, `http://${request.headers.host}`).searchParams;
+			const url = new URL(request.url, `http://${request.headers.host}`);
+			if (url.pathname !== '/streaming' && url.pathname !== '/client-streaming') {
+				socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+				socket.destroy();
+				return;
+			}
+			const q = url.searchParams;
+			const clientApi = url.pathname === '/client-streaming';
+			if (clientApi) {
+				const incompatible = desktopUpdateRequired(request.headers, this.config.version, q);
+				if (incompatible) {
+					const body = JSON.stringify(incompatible);
+					socket.end(`HTTP/1.1 426 Upgrade Required\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`);
+					return;
+				}
+			}
+			const protocol = request.headers['x-camp-client'] as string | undefined ?? q.get('client') ?? undefined;
 
 			let user: MiLocalUser | null = null;
 			let app: MiAccessToken | null = null;
+			let sessionId: string | undefined;
 
 			// https://datatracker.ietf.org/doc/html/rfc6750.html#section-2.1
 			// Note that the standard WHATWG WebSocket API does not support setting any headers,
@@ -62,13 +85,20 @@ export class StreamingApiServerService {
 				: q.get('i');
 
 			try {
-				[user, app] = await this.authenticateService.authenticate(token);
+				[user, app, sessionId] = await this.authenticateService.authenticate(token, protocol, clientApi);
 
 				if (app !== null && !app.permission.some(p => p === 'read:account')) {
 					throw new AuthenticationError('Your app does not have necessary permissions to use websocket API.');
 				}
 			} catch (e) {
 				if (e instanceof AuthenticationError) {
+					if (token?.startsWith('cs_') && protocol === (clientApi ? 'desktop-v1' : 'web-v1')) {
+						this.#wss.handleUpgrade(request, socket, head, ws => {
+							ws.send(JSON.stringify({ type: 'clientSessionRevoked', body: {} }));
+							ws.close(4001, 'Client session revoked');
+						});
+						return;
+					}
 					socket.write([
 						'HTTP/1.1 401 Unauthorized',
 						'WWW-Authenticate: Bearer realm="Misskey", error="invalid_token", error_description="Failed to authenticate"',
@@ -97,7 +127,7 @@ export class StreamingApiServerService {
 
 			this.#wss.handleUpgrade(request, socket, head, (ws) => {
 				this.#wss.emit('connection', ws, request, {
-					stream, user, app,
+					stream, user, app, sessionId,
 				});
 			});
 		});
@@ -112,31 +142,56 @@ export class StreamingApiServerService {
 		this.#wss.on('connection', async (connection: WebSocket.WebSocket, request: http.IncomingMessage, ctx: {
 			stream: MainStreamConnection,
 			user: MiLocalUser | null;
-			app: MiAccessToken | null
+			app: MiAccessToken | null;
+			sessionId?: string;
 		}) => {
 			const { stream, user } = ctx;
 
 			const ev = new EventEmitter();
+			let counted = false;
+			const revoked = () => {
+				if (connection.readyState !== WebSocket.WebSocket.OPEN) return;
+				connection.send(JSON.stringify({ type: 'clientSessionRevoked', body: {} }));
+				connection.close(4001, 'Client session revoked');
+			};
 
 			function onRedisMessage(data: any): void {
+				if (data.channel === 'internal' && data.message.type === 'clientSessionRevoked' &&
+					data.message.body.userId === user?.id && ctx.sessionId &&
+					(!data.message.body.sessionId || data.message.body.sessionId === ctx.sessionId)) {
+					revoked();
+					return;
+				}
 				ev.emit(data.channel, data.message);
 			}
-
-			globalEv.on('message', onRedisMessage);
-
-			await stream.listen(ev, connection);
-
-			this.#connections.set(connection, Date.now());
-
-			if (user) this.onUserConnected(user);
 
 			connection.once('close', () => {
 				ev.removeAllListeners();
 				stream.dispose();
 				globalEv.off('message', onRedisMessage);
 				this.#connections.delete(connection);
-				if (user) this.onUserDisconnected(user);
+				if (user && counted) this.onUserDisconnected(user);
 			});
+			globalEv.on('message', onRedisMessage);
+
+			try {
+				await stream.listen(ev, connection);
+				// A revocation can happen after authentication while stream.init
+				// runs. Subscribe first, then recheck to cover that setup interval.
+				if (user && ctx.sessionId && !await this.clientSessionService.isActive(user.id, ctx.sessionId)) {
+					revoked();
+					return;
+				}
+			} catch {
+				connection.close(1011, 'Failed to initialize stream');
+				return;
+			}
+			if (connection.readyState !== WebSocket.WebSocket.OPEN) return;
+			this.#connections.set(connection, Date.now());
+			if (user) {
+				counted = true;
+				this.onUserConnected(user);
+			}
 
 			connection.on('pong', () => {
 				this.#connections.set(connection, Date.now());

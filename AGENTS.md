@@ -31,13 +31,14 @@
    - PR 和直接推送默认以 `master` 为目标；本仓库不使用 `develop` 作为日常开发主线。
 6. **独立授权美术单独管理**
    - 开发和部署约定见 [ASSETS.md](ASSETS.md)。网页素材放在 `private-assets/public/`，原稿与授权记录放在 `public/` 外；两个目录及素材链接均不提交到公开仓库。
-   - 团队素材库是 `HePudding/trekker-camp-assets`（Private，`master`）。首次准备团队开发环境用 `pnpm assets:pull`，以后按需快进同步；它会保留未提交素材和开发分支。无素材库权限时可用 `pnpm assets:link` 创建空目录。`pnpm dev` 离线建立或复用链接，通过 `/client-assets/camp/` 加载。多个 worktree 可通过 `CAMP_ASSETS_DIR` 共用已有的 `public` 目录。
+   - 团队素材库是 `stellasora-cafe/trekker-camp-assets`（Private，`master`）。首次准备团队开发环境用 `pnpm assets:pull`，以后按需快进同步；它会保留未提交素材和开发分支。无素材库权限时可用 `pnpm assets:link` 创建空目录。`pnpm dev` 离线建立或复用链接，通过 `/client-assets/camp/` 加载。多个 worktree 可通过 `CAMP_ASSETS_DIR` 共用已有的 `public` 目录。
    - 保持素材运行时加载，不将其 import、内嵌或复制进 JS/CSS 包、公开资源目录及镜像。程序代码、样式和构建脚本保持公开；没有私有素材时仍可构建、运行并使用默认资源或回退。
    - Docker 使用 `compose.assets.yml` 只读挂载素材。不要将整个素材仓库（含原稿、授权记录或 `.git`）暴露为静态目录。
    - 不强制添加忽略的素材或链接，不创建指向私有素材库的 Git 子模块。修改素材机制、忽略规则或部署挂载时运行 `pnpm assets:test`；交付流程自动执行 `assets:check`。
    - 素材与代码分别提交。素材库的 `master` 更新在配置服务器后会自动同步 `public/`，未经授权不推送素材库 `master`。素材库的 Agent 规则与授权记录分别位于其 `AGENTS.md` 和 `RIGHTS.md`；不将 SSH 凭据加入任何仓库。
 
 7. **本站 VPS 使用部署 CLI**
+   - 生产部署只消费 `server-v*` 标签对应的已发布 GitHub Release，使用精简部署包和固定 digest 的容器镜像，不在服务器拉取主仓库。创建标签、发布 Release 与生产部署分别遵循用户授权。
    - 运维入口和存储布局见 [DEPLOY.zh-CN.md](DEPLOY.zh-CN.md)。终端中直接运行 `camp` 打开交互菜单；Agent 自动化使用子命令。首次部署用 `camp install`，应用与素材更新用 `camp update`，CLI 自身更新用 `camp self-update`，版本用 `camp version` 查看。
    - 首次配置使用仓库随附的 Misskey Docker 示例模板，初始化调用 `pnpm run init`，Web 使用镜像默认 `migrateandstart` 入口；更新先备份、独立执行官方迁移，再启动并检查健康状态。保留已有实例配置和数据。
    - 启停使用 `camp start`、`camp stop`、`camp restart`；开机自启使用 `camp autostart on/off`，状态由 `camp status` 显示。保留数据目录中的 `.config/compose.autostart.yml`，启停和自启设置与更新、备份共用锁；不要通过停用整个 Docker 服务来关闭本站自启。

@@ -42,6 +42,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 					</button>
 				</div>
 			</div>
+			<div v-if="accountsFailed" class="_gaps_s" role="status">
+				<span>{{ i18n.ts.failedToFetchAccountInformation }}</span>
+				<MkButton small :disabled="loadingAccounts" @click="init">{{ i18n.ts.retry }}</MkButton>
+			</div>
 			<div class="_buttonsCenter">
 				<MkButton rounded gradate :disabled="selectedUser === null" @click="clickChooseAccount">{{ i18n.ts.continue }} <i class="ti ti-arrow-right"></i></MkButton>
 			</div>
@@ -117,6 +121,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import * as Misskey from 'misskey-js';
+import { host } from '@@/js/config.js';
 import MkButton from '@/components/MkButton.vue';
 import { $i } from '@/i.js';
 import { getAccounts, getAccountWithSigninDialog, getAccountWithSignupDialog } from '@/accounts.js';
@@ -138,7 +143,9 @@ const emit = defineEmits<{
 	(ev: 'deny', token: string): void;
 }>();
 
-const waiting = ref(true);
+const waiting = ref(false);
+const loadingAccounts = ref(false);
+const accountsFailed = ref(false);
 const _waiting = computed(() => waiting.value || props.manualWaiting);
 const phase = ref<'accountSelect' | 'consent' | 'success' | 'denied' | 'failed'>('accountSelect');
 
@@ -147,41 +154,35 @@ const selectedUser = ref<string | null>(null);
 const users = ref(new Map<string, Misskey.entities.UserDetailed & { token: string; }>());
 
 async function init() {
-	waiting.value = true;
-
-	users.value.clear();
+	if (loadingAccounts.value) return;
+	loadingAccounts.value = true;
+	accountsFailed.value = false;
 
 	if ($i) {
 		users.value.set($i.id, $i);
 	}
 
-	const accounts = await getAccounts();
-
-	const accountIdsToFetch = accounts.map(a => a.id).filter(id => !users.value.has(id));
-
-	if (accountIdsToFetch.length > 0) {
-		const usersRes = await misskeyApi('users/show', {
-			userIds: accountIdsToFetch,
-		});
-
-		for (const user of usersRes) {
-			if (users.value.has(user.id)) continue;
-
-			const account = accounts.find(a => a.id === user.id);
-
-			if (!account || account.token == null) continue;
-
-			users.value.set(user.id, {
-				...user,
-				token: account.token,
-			});
-		}
+	try {
+		const accounts = (await getAccounts()).filter(account => account.host === host && account.token && !users.value.has(account.id));
+		await Promise.all(accounts.map(async account => {
+			try {
+				const user = await misskeyApi('users/show', { userId: account.id }, account.token);
+				users.value.set(user.id, { ...user, token: account.token! });
+			} catch (error) {
+				const code = (error as { code?: string } | null)?.code;
+				if (!['NO_SUCH_USER', 'AUTHENTICATION_FAILED', 'USER_IS_DELETED', 'YOUR_ACCOUNT_SUSPENDED', 'INVALID_PARAM'].includes(code ?? '')) {
+					accountsFailed.value = true;
+				}
+			}
+		}));
+	} catch {
+		accountsFailed.value = true;
+	} finally {
+		loadingAccounts.value = false;
 	}
-
-	waiting.value = false;
 }
 
-init();
+void init();
 
 function clickAddAccount(ev: PointerEvent) {
 	selectedUser.value = null;

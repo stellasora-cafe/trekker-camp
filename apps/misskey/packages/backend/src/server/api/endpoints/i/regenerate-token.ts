@@ -8,6 +8,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import type { UsersRepository, UserProfilesRepository } from '@/models/_.js';
 import { generateNativeUserToken } from '@/misc/token.js';
+import { ClientSessionService } from '@/core/ClientSessionService.js';
 import { GlobalEventService } from '@/core/GlobalEventService.js';
 import { DI } from '@/di-symbols.js';
 
@@ -34,6 +35,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		@Inject(DI.userProfilesRepository)
 		private userProfilesRepository: UserProfilesRepository,
 
+		private clientSessionService: ClientSessionService,
 		private globalEventService: GlobalEventService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
@@ -54,6 +56,8 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			await this.usersRepository.update(me.id, {
 				token: newToken,
 			});
+
+			await this.clientSessionService.revokeAll(me.id);
 
 			// Publish event
 			this.globalEventService.publishInternalEvent('userTokenRegenerated', { id: me.id, oldToken, newToken });

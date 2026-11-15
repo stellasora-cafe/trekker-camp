@@ -548,7 +548,10 @@ class APIClient {
         origin: APIClient['origin'];
         credential?: APIClient['credential'];
         fetch?: APIClient['fetch'] | null | undefined;
+        client?: APIClient['client'];
     });
+    // (undocumented)
+    client: 'web-v1' | 'third-party-v1';
     // (undocumented)
     credential: string | null | undefined;
     // (undocumented)
@@ -1252,6 +1255,30 @@ type ChatRoomsUpdateRequest = operations['chat___rooms___update']['requestBody']
 type ChatRoomsUpdateResponse = operations['chat___rooms___update']['responses']['200']['content']['application/json'];
 
 // @public (undocumented)
+type ClientAuthApproveRequest = operations['client-auth___approve']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
+type ClientAuthCheckRequest = operations['client-auth___check']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
+type ClientAuthCheckResponse = operations['client-auth___check']['responses']['200']['content']['application/json'];
+
+// @public (undocumented)
+type ClientAuthShowRequest = operations['client-auth___show']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
+type ClientAuthShowResponse = operations['client-auth___show']['responses']['200']['content']['application/json'];
+
+// @public (undocumented)
+type ClientAuthStartRequest = operations['client-auth___start']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
+type ClientAuthStartResponse = operations['client-auth___start']['responses']['200']['content']['application/json'];
+
+// @public (undocumented)
+type ClientResourcesResponse = operations['client-resources']['responses']['200']['content']['application/json'];
+
+// @public (undocumented)
 type Clip = components['schemas']['Clip'];
 
 // @public (undocumented)
@@ -1824,6 +1851,14 @@ declare namespace entities {
         ChatRoomsShowResponse,
         ChatRoomsUpdateRequest,
         ChatRoomsUpdateResponse,
+        ClientAuthApproveRequest,
+        ClientAuthCheckRequest,
+        ClientAuthCheckResponse,
+        ClientAuthShowRequest,
+        ClientAuthShowResponse,
+        ClientAuthStartRequest,
+        ClientAuthStartResponse,
+        ClientResourcesResponse,
         ClipsAddNoteRequest,
         ClipsCreateRequest,
         ClipsCreateResponse,
@@ -1976,6 +2011,7 @@ declare namespace entities {
         IAuthorizedAppsResponse,
         IChangePasswordRequest,
         IClaimAchievementRequest,
+        IClientSessionsResponse,
         IDeleteAccountRequest,
         IExportFollowingRequest,
         IFavoritesRequest,
@@ -2016,6 +2052,7 @@ declare namespace entities {
         IRegistryRemoveRequest,
         IRegistryScopesWithDomainResponse,
         IRegistrySetRequest,
+        IRevokeClientSessionRequest,
         IRevokeTokenRequest,
         ISigninHistoryRequest,
         ISigninHistoryResponse,
@@ -2027,6 +2064,8 @@ declare namespace entities {
         IUpdateEmailResponse,
         IUpdatePhoneRequest,
         IUpdatePhoneResponse,
+        IUpgradeClientSessionRequest,
+        IUpgradeClientSessionResponse,
         IWebhooksCreateRequest,
         IWebhooksCreateResponse,
         IWebhooksDeleteRequest,
@@ -2640,6 +2679,9 @@ export interface IChannelConnection<Channel extends AnyOf<Channels> = AnyOf<Chan
 type IClaimAchievementRequest = operations['i___claim-achievement']['requestBody']['content']['application/json'];
 
 // @public (undocumented)
+type IClientSessionsResponse = operations['i___client-sessions']['responses']['200']['content']['application/json'];
+
+// @public (undocumented)
 type ID = string;
 
 // @public (undocumented)
@@ -2784,6 +2826,9 @@ type IRegistrySetRequest = operations['i___registry___set']['requestBody']['cont
 type IResponse = operations['i']['responses']['200']['content']['application/json'];
 
 // @public (undocumented)
+type IRevokeClientSessionRequest = operations['i___revoke-client-session']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
 type IRevokeTokenRequest = operations['i___revoke-token']['requestBody']['content']['application/json'];
 
 // @public (undocumented)
@@ -2810,6 +2855,8 @@ export interface IStream extends EventEmitter<StreamEvents> {
     heartbeat(): void;
     // (undocumented)
     ping(): void;
+    // (undocumented)
+    reconnect(force?: boolean): void;
     // Warning: (ae-forgotten-export) The symbol "SharedConnection" needs to be exported by the entry point index.d.ts
     //
     // (undocumented)
@@ -2855,6 +2902,12 @@ type IUpdateRequest = operations['i___update']['requestBody']['content']['applic
 
 // @public (undocumented)
 type IUpdateResponse = operations['i___update']['responses']['200']['content']['application/json'];
+
+// @public (undocumented)
+type IUpgradeClientSessionRequest = operations['i___upgrade-client-session']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
+type IUpgradeClientSessionResponse = operations['i___upgrade-client-session']['responses']['200']['content']['application/json'];
 
 // @public (undocumented)
 type IWebhooksCreateRequest = operations['i___webhooks___create']['requestBody']['content']['application/json'];
@@ -3522,6 +3575,7 @@ export class Stream extends EventEmitter<StreamEvents> implements IStream {
     } | null, options?: {
         WebSocket?: Options['WebSocket'];
         binaryType?: ReconnectingWebSocket['binaryType'];
+        client?: 'web-v1' | 'third-party-v1';
     });
     // (undocumented)
     close(): void;
@@ -3531,6 +3585,8 @@ export class Stream extends EventEmitter<StreamEvents> implements IStream {
     heartbeat(): void;
     // (undocumented)
     ping(): void;
+    // (undocumented)
+    reconnect(force?: boolean): void;
     // (undocumented)
     removeSharedConnection(connection: SharedConnection): void;
     // (undocumented)
@@ -3553,6 +3609,9 @@ export class Stream extends EventEmitter<StreamEvents> implements IStream {
 export type StreamEvents = {
     _connected_: void;
     _disconnected_: void;
+    _reconnected_: void;
+    _authenticationFailed_: void;
+    _pong_: void;
 } & BroadcastEvents;
 
 // Warning: (ae-forgotten-export) The symbol "SwitchCase" needs to be exported by the entry point index.d.ts
@@ -3801,7 +3860,7 @@ type VerifyEmailRequest = operations['verify-email']['requestBody']['content']['
 
 // Warnings were encountered during analysis:
 //
-// src/streaming.ts:57:3 - (ae-forgotten-export) The symbol "ReconnectingWebSocket" needs to be exported by the entry point index.d.ts
+// src/streaming.ts:62:3 - (ae-forgotten-export) The symbol "ReconnectingWebSocket" needs to be exported by the entry point index.d.ts
 // src/streaming.types.ts:236:4 - (ae-forgotten-export) The symbol "ReversiUpdateKey" needs to be exported by the entry point index.d.ts
 // src/streaming.types.ts:251:4 - (ae-forgotten-export) The symbol "ReversiUpdateSettings" needs to be exported by the entry point index.d.ts
 

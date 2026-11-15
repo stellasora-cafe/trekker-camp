@@ -12,6 +12,7 @@ import type { MiLocalUser } from '@/models/User.js';
 import { GlobalEventService } from '@/core/GlobalEventService.js';
 import { SigninEntityService } from '@/core/entities/SigninEntityService.js';
 import { bindThis } from '@/decorators.js';
+import { ClientSessionService, clientDeviceFromHeaders } from '@/core/ClientSessionService.js';
 import { EmailService } from '@/core/EmailService.js';
 import { NotificationService } from '@/core/NotificationService.js';
 import type { FastifyRequest, FastifyReply } from 'fastify';
@@ -25,6 +26,7 @@ export class SigninService {
 		@Inject(DI.userProfilesRepository)
 		private userProfilesRepository: UserProfilesRepository,
 
+		private clientSessionService: ClientSessionService,
 		private signinEntityService: SigninEntityService,
 		private emailService: EmailService,
 		private notificationService: NotificationService,
@@ -34,7 +36,7 @@ export class SigninService {
 	}
 
 	@bindThis
-	public signin(request: FastifyRequest, reply: FastifyReply, user: MiLocalUser) {
+	public async signin(request: FastifyRequest, reply: FastifyReply, user: MiLocalUser) {
 		setImmediate(async () => {
 			this.notificationService.createNotification(user.id, 'login', {});
 
@@ -56,11 +58,13 @@ export class SigninService {
 			}
 		});
 
+		const { token } = await this.clientSessionService.issue(user.id, request.url.startsWith('/api/client/') ? 'desktop' : 'web',
+			clientDeviceFromHeaders(request.headers), request.ip, request.headers['user-agent'] ?? '');
 		reply.code(200);
 		return {
 			finished: true,
 			id: user.id,
-			i: user.token!,
+			i: token,
 		} satisfies Misskey.entities.SigninFlowResponse;
 	}
 }

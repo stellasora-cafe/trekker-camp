@@ -57,13 +57,15 @@ SPDX-License-Identifier: AGPL-3.0-only
 	</div>
 </Transition>
 
-<component
-	:is="popup.component"
-	v-for="popup in popups"
-	:key="popup.id"
-	v-bind="popup.props"
-	v-on="popup.events"
-/>
+<Teleport to="#camp-desktop-overlays" :disabled="!customChrome" defer>
+	<component
+		:is="popup.component"
+		v-for="popup in popups"
+		:key="popup.id"
+		v-bind="popup.props"
+		v-on="popup.events"
+	/>
+</Teleport>
 
 <component
 	:is="prefer.s.animation ? TransitionGroup : 'div'"
@@ -86,8 +88,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<XNotification :notification="notification"/>
 	</div>
 </component>
-
-<XStreamIndicator/>
 
 <div v-if="pendingApiRequestsCount > 0" id="wait"></div>
 
@@ -117,16 +117,16 @@ import { useStream } from '@/stream.js';
 import { i18n } from '@/i18n.js';
 import { prefer } from '@/preferences.js';
 import { globalEvents } from '@/events.js';
-import { store } from '@/store.js';
 import XNavbar from '@/ui/_common_/navbar.vue';
+import { hasDesktopWindowChrome } from '@/utility/desktop-window.js';
 
-const XStreamIndicator = defineAsyncComponent(() => import('./stream-indicator.vue'));
 const XWidgets = defineAsyncComponent(() => import('./widgets.vue'));
 
 const drawerMenuShowing = defineModel<boolean>('drawerMenuShowing');
 const widgetsShowing = defineModel<boolean>('widgetsShowing');
 
 const dev = _DEV_;
+const customChrome = hasDesktopWindowChrome();
 
 const notifications = ref<Misskey.entities.Notification[]>([]);
 
@@ -134,9 +134,7 @@ function onNotification(notification: Misskey.entities.Notification, isClient = 
 	if (window.document.visibilityState === 'visible') {
 		if (!isClient && notification.type !== 'test') {
 			// サーバーサイドのテスト通知の際は自動で既読をつけない（テストできないので）
-			if (store.s.realtimeMode) {
-				useStream().send('readNotification');
-			}
+			useStream().send('readNotification');
 		}
 
 		notifications.value.unshift(notification);
@@ -160,10 +158,8 @@ function exitSafeMode() {
 }
 
 if ($i) {
-	if (store.s.realtimeMode) {
-		const connection = useStream().useChannel('main');
-		connection.on('notification', onNotification);
-	}
+	const connection = useStream().useChannel('main');
+	connection.on('notification', onNotification);
 	globalEvents.on('clientNotification', notification => onNotification(notification, true));
 
 	if ('serviceWorker' in navigator) {

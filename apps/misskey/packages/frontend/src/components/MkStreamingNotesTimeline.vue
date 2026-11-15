@@ -58,7 +58,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 <script lang="ts" setup>
 import { computed, watch, onUnmounted, provide, useTemplateRef, TransitionGroup, onMounted, onActivated, onDeactivated, shallowRef, ref, markRaw } from 'vue';
 import * as Misskey from 'misskey-js';
-import { useInterval } from '@@/js/use-interval.js';
 import { useDocumentVisibility } from '@@/js/use-document-visibility.js';
 import { getScrollContainer, scrollToTop } from '@@/js/scroll.js';
 import type { BasicTimelineType } from '@/timelines.js';
@@ -70,7 +69,6 @@ import * as sound from '@/utility/sound.js';
 import { $i } from '@/i.js';
 import { instance } from '@/instance.js';
 import { prefer } from '@/preferences.js';
-import { store } from '@/store.js';
 import MkNote from '@/components/MkNote.vue';
 import MkButton from '@/components/MkButton.vue';
 import { i18n } from '@/i18n.js';
@@ -80,6 +78,7 @@ import { isSeparatorNeeded, getSeparatorInfo } from '@/utility/timeline-date-sep
 import { Paginator } from '@/utility/paginator.js';
 import { claimAchievement, claimedAchievements } from '@/utility/achievements.js';
 import { TimelineAchievementTracker } from '@/utility/achievement-timeline.js';
+import { offline } from '@/utility/offline.js';
 
 const props = withDefaults(defineProps<{
 	src: BasicTimelineType | 'mentions' | 'directs' | 'list' | 'antenna' | 'channel' | 'role';
@@ -197,6 +196,10 @@ onMounted(() => {
 	}
 });
 
+watch(offline, (value, previous) => {
+	if (!value && previous) void paginator.reload();
+});
+
 function isTop() {
 	if (scrollContainer == null) return true;
 	if (rootEl.value == null) return true;
@@ -255,31 +258,6 @@ watch(visibility, () => {
 
 let adInsertionCounter = 0;
 
-const MIN_POLLING_INTERVAL = 1000 * 10;
-const POLLING_INTERVAL =
-	prefer.s.pollingInterval === 1 ? MIN_POLLING_INTERVAL * 1.5 * 1.5 :
-	prefer.s.pollingInterval === 2 ? MIN_POLLING_INTERVAL * 1.5 :
-	prefer.s.pollingInterval === 3 ? MIN_POLLING_INTERVAL :
-	MIN_POLLING_INTERVAL;
-
-if (!store.s.realtimeMode) {
-	// TODO: 先頭のノートの作成日時が1日以上前であれば流速が遅いTLと見做してインターバルを通常より延ばす
-	useInterval(async () => {
-		paginator.fetchNewer({
-			toQueue: !isTop() || isPausingUpdate,
-		});
-	}, POLLING_INTERVAL, {
-		immediate: false,
-		afterMounted: true,
-	});
-
-	useGlobalEvent('notePosted', (note) => {
-		paginator.fetchNewer({
-			toQueue: !isTop() || isPausingUpdate,
-		});
-	});
-}
-
 useGlobalEvent('noteDeleted', (noteId) => {
 	paginator.removeItem(noteId);
 });
@@ -324,7 +302,7 @@ function prepend(note: Misskey.entities.Note & MisskeyEntity) {
 	}
 }
 
-const stream = store.s.realtimeMode ? useStream() : null;
+const stream = useStream();
 
 const connections = {
 	antenna: null as Misskey.IChannelConnection<Misskey.Channels['antenna']> | null,
@@ -417,19 +395,28 @@ function disconnectChannel() {
 	}
 }
 
-if (store.s.realtimeMode) {
-	connectChannel();
+connectChannel();
+let disconnectedAt: string | null | undefined;
+stream.on('_disconnected_', rememberTimelinePosition);
+stream.on('_reconnected_', recoverTimeline);
+
+function rememberTimelinePosition() {
+	disconnectedAt = paginator.getNewestId();
+}
+
+function recoverTimeline() {
+	void paginator.fetchNewer({ toQueue: !isTop() || isPausingUpdate, sinceId: disconnectedAt, catchUp: true });
 }
 
 watch(() => [props.list, props.antenna, props.channel, props.role, props.withRenotes], () => {
-	if (store.s.realtimeMode) {
-		disconnectChannel();
-		connectChannel();
-	}
+	disconnectChannel();
+	connectChannel();
 });
 watch(() => props.withSensitive, reloadTimeline);
 
 onUnmounted(() => {
+	stream.off('_disconnected_', rememberTimelinePosition);
+	stream.off('_reconnected_', recoverTimeline);
 	disconnectChannel();
 });
 

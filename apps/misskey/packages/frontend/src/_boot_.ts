@@ -15,10 +15,9 @@ if (import.meta.env.DEV) {
 import '@/style.scss';
 import { mainBoot } from '@/boot/main-boot.js';
 import { subBoot } from '@/boot/sub-boot.js';
+import { usesMinimumShell } from '@/utility/page-back.js';
 
-const subBootPaths = ['/share', '/auth', '/miauth', '/oauth', '/signup-complete', '/verify-email', '/install-extensions'];
-
-if (subBootPaths.some(i => window.location.pathname === i || window.location.pathname.startsWith(i + '/'))) {
+if (usesMinimumShell(window.location.pathname)) {
 	subBoot();
 } else {
 	mainBoot();

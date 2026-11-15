@@ -6,9 +6,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 <template>
 <div>
 	<MkAnimBg style="position: absolute;"/>
-	<div class="_pageScrollable" :class="$style.body">
+	<PageWithHeader :class="$style.body">
 		<slot></slot>
-	</div>
+	</PageWithHeader>
 </div>
 </template>
 

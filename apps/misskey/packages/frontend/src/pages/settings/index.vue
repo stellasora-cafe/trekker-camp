@@ -46,7 +46,7 @@ import { clearCache } from '@/utility/clear-cache.js';
 import { instance } from '@/instance.js';
 import { definePage, provideMetadataReceiver, provideReactiveMetadata } from '@/page.js';
 import * as os from '@/os.js';
-import { useRouter } from '@/router.js';
+import { usePageBackRoot, useRouter } from '@/router.js';
 import { enableAutoBackup, getPreferencesProfileMenu } from '@/preferences/utility.js';
 import { store } from '@/store.js';
 import { signout } from '@/signout.js';
@@ -69,6 +69,7 @@ const childInfo = ref<null | PageMetadata>(null);
 const router = useRouter();
 
 const narrow = ref(false);
+usePageBackRoot(router, '/settings/profile', computed(() => !narrow.value));
 const NARROW_THRESHOLD = 600;
 
 const currentPage = computed(() => router.currentRef.value.child);
@@ -113,6 +114,11 @@ const menuDef = computed<SuperMenuDef[]>(() => [{
 		text: i18n.ts.security,
 		to: '/settings/security',
 		active: currentPage.value?.route.name === 'security',
+	}, {
+		icon: 'ti ti-devices',
+		text: i18n.ts._clientSessions.title,
+		to: '/settings/devices',
+		active: currentPage.value?.route.name === 'devices',
 	}],
 }, {
 	items: [{

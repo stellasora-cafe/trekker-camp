@@ -33,9 +33,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { onActivated, onDeactivated, onMounted, ref } from 'vue';
+import { onActivated, onMounted, onUnmounted, ref } from 'vue';
 import * as Misskey from 'misskey-js';
-import { useInterval } from '@@/js/use-interval.js';
+import { useStream } from '@/stream.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import { i18n } from '@/i18n.js';
 import { ensureSignin } from '@/i.js';
@@ -57,50 +57,39 @@ async function fetchHistory() {
 
 	fetching.value = true;
 
-	const [userMessages, roomMessages] = await Promise.all([
-		misskeyApi('chat/history', { room: false }),
-		misskeyApi('chat/history', { room: true }),
-	]);
+	try {
+		const [userMessages, roomMessages] = await Promise.all([
+			misskeyApi('chat/history', { room: false }),
+			misskeyApi('chat/history', { room: true }),
+		]);
 
-	history.value = [...userMessages, ...roomMessages]
-		.toSorted((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-		.map(m => ({
-			id: m.id,
-			message: m,
-			other: (!('room' in m) || m.room == null) ? (m.fromUserId === $i.id ? m.toUser : m.fromUser) : null,
-			isMe: m.fromUserId === $i.id,
-		}));
-
-	fetching.value = false;
-	initializing.value = false;
-}
-
-let isActivated = true;
-
-onActivated(() => {
-	isActivated = true;
-});
-
-onDeactivated(() => {
-	isActivated = false;
-});
-
-useInterval(() => {
-	// TODO: DOM的にバックグラウンドになっていないかどうかも考慮する
-	if (isActivated) {
-		fetchHistory();
+		history.value = [...userMessages, ...roomMessages]
+			.toSorted((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+			.map(m => ({
+				id: m.id,
+				message: m,
+				other: (!('room' in m) || m.room == null) ? (m.fromUserId === $i.id ? m.toUser : m.fromUser) : null,
+				isMe: m.fromUserId === $i.id,
+			}));
+	} catch { /* Keep existing chat history during a network interruption. */ } finally {
+		fetching.value = false;
+		initializing.value = false;
 	}
-}, 1000 * 10, {
-	immediate: false,
-	afterMounted: true,
-});
+}
 
 onActivated(() => {
 	fetchHistory();
 });
 
 onMounted(() => {
-	fetchHistory();
+	void fetchHistory();
+	useStream().on('_reconnected_', fetchHistory);
+	const connection = useStream().useChannel('main');
+	connection.on('newChatMessage', fetchHistory);
+	onUnmounted(() => {
+		connection.dispose();
+		useStream().off('_reconnected_', fetchHistory);
+	});
 });
 </script>
 

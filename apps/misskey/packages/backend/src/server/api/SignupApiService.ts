@@ -7,6 +7,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { IsNull } from 'typeorm';
 import { DI } from '@/di-symbols.js';
 import type { RegistrationTicketsRepository, UserProfilesRepository } from '@/models/_.js';
+import { ClientSessionService, clientDeviceFromHeaders } from '@/core/ClientSessionService.js';
 import { MetaService } from '@/core/MetaService.js';
 import { SignupService } from '@/core/SignupService.js';
 import { UserEntityService } from '@/core/entities/UserEntityService.js';
@@ -18,6 +19,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 @Injectable()
 export class SignupApiService {
 	constructor(
+		private clientSessionService: ClientSessionService,
 		private metaService: MetaService,
 		@Inject(DI.userProfilesRepository) private profiles: UserProfilesRepository,
 		@Inject(DI.registrationTicketsRepository) private tickets: RegistrationTicketsRepository,
@@ -58,14 +60,16 @@ export class SignupApiService {
 			}
 			try {
 				await this.codes.consume([challengeId]);
-				const { account, secret } = await this.signupService.signup({
+				const { account } = await this.signupService.signup({
 					username: body.username, password: body.password,
 					...(channel === 'sms' ? { phoneNumber: challenge.address } : { verifiedEmail: challenge.address }),
 					host: process.env.NODE_ENV === 'test' ? body.host : undefined,
 				});
 				if (ticket) await this.tickets.update(ticket.id, { usedById: account.id });
 				const result = await this.userEntityService.pack(account, account, { schema: 'MeDetailed', includeSecrets: true });
-				return { ...result, token: secret };
+				const { token } = await this.clientSessionService.issue(account.id, request.url.startsWith('/api/client/') ? 'desktop' : 'web',
+					clientDeviceFromHeaders(request.headers), request.ip, request.headers['user-agent'] ?? '');
+				return { ...result, token };
 			} catch (err) {
 				if (ticket) await this.tickets.update({ id: ticket.id, usedById: IsNull() }, { usedAt: null });
 				if ((err as { code?: string }).code === '23505') throw new VerificationError('PHONE_UNAVAILABLE');

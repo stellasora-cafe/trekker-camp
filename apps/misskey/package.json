@@ -11,7 +11,7 @@
 	"scripts": {
 		"build-pre": "node scripts/build-pre.mjs",
 		"build-assets": "node ./scripts/build-assets.mjs",
-		"build": "pnpm build-pre && pnpm --filter \"{./packages/**}...\" --filter \"{./packages-private/**}...\" -r build && pnpm build-assets",
+		"build": "pnpm build-pre && pnpm --filter \"{./packages/**}...\" --filter \"{./packages-private/**}...\" -r build && pnpm build-assets && node ../../scripts/build-desktop-frontend.mjs --publish-only",
 		"build-storybook": "pnpm --filter frontend build-storybook",
 		"build-misskey-js-with-types": "pnpm build-pre && pnpm --filter backend... --filter=!misskey-js build && pnpm --filter backend generate-api-json --no-build && ncp packages/backend/built/api.json packages/misskey-js/generator/api.json && pnpm --filter misskey-js update-autogen-code && pnpm --filter misskey-js build && pnpm --filter misskey-js api",
 		"start": "node scripts/start.mjs",

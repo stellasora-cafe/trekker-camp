@@ -332,6 +332,7 @@ export type NoteUpdatedEvent = { id: Note['id'] } & ({
 });
 
 export type BroadcastEvents = {
+	clientResourcesUpdated: (payload: { revision: string; paths: string[] }) => void;
 	noteUpdated: (payload: NoteUpdatedEvent) => void;
 	emojiAdded: (payload: EmojiAdded) => void;
 	emojiUpdated: (payload: EmojiUpdated) => void;

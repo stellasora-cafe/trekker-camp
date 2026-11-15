@@ -15,6 +15,7 @@ import { i18n } from '@/i18n.js';
 import * as os from '@/os.js';
 import { deepEqual } from '@/utility/deep-equal.js';
 import { deepClone } from '@/utility/clone.js';
+import { isDesktopClient, offline } from '@/utility/offline.js';
 
 // NOTE: 明示的な設定値のひとつとして null もあり得るため、設定が存在しないかどうかを判定する目的で null で比較したり ?? を使ってはいけない
 
@@ -236,7 +237,9 @@ export class PreferencesManager extends EventEmitter<PreferencesManagerEvents> {
 			this.save();
 		}
 
-		this.cloudReady = this.fetchCloudValues();
+		this.cloudReady = this.fetchCloudValues().catch(error => {
+			if (!isDesktopClient() || !offline.value) throw error;
+		});
 
 		// TODO: 定期的にクラウドの値をフェッチ
 	}

@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { checkSourceLocation, linkPrivateAssets } from './private-assets.mjs';
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
-const repositoryUrl = 'https://github.com/HePudding/trekker-camp-assets.git';
+const repositoryUrl = 'https://github.com/stellasora-cafe/trekker-camp-assets.git';
 
 function git(directory, args, options = {}) {
 	return execFileSync('git', ['-C', directory, ...args], {
@@ -20,7 +20,8 @@ function git(directory, args, options = {}) {
 }
 
 function sameRepository(actual, expected) {
-	const normalize = url => url.replace(/^git@github\.com:/, 'https://github.com/').replace(/\.git$/, '').toLowerCase();
+	const normalize = url => url.replace(/^git@github\.com:/, 'https://github.com/').replace(/\.git$/, '').toLowerCase()
+		.replace(/^https:\/\/github\.com\/hepudding\/trekker-camp-assets$/, 'https://github.com/stellasora-cafe/trekker-camp-assets');
 	return normalize(actual) === normalize(expected);
 }
 

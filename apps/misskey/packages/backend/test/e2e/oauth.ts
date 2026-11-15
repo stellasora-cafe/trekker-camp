@@ -60,6 +60,7 @@ interface GetTokenError {
 }
 
 const clientConfig: ModuleOptions<'client_id'> = {
+	http: { headers: { 'X-Camp-Client': 'third-party-v1' } },
 	client: {
 		id: `http://127.0.0.1:${clientPort}/`,
 		secret: '',
@@ -817,6 +818,7 @@ describe('OAuth', () => {
 			const response = await fetch(new URL('/oauth/token', host), {
 				method: 'post',
 				headers: {
+					'X-Camp-Client': 'third-party-v1',
 					'content-type': 'application/json',
 				},
 				body: JSON.stringify({
@@ -846,6 +848,7 @@ describe('OAuth', () => {
 			const response = await fetch(new URL('/oauth/token', host), {
 				method: 'post',
 				headers: {
+					'X-Camp-Client': 'third-party-v1',
 					'content-type': 'application/x-www-form-urlencoded',
 				},
 				body: new URLSearchParams({
@@ -1071,7 +1074,6 @@ describe('OAuth', () => {
 					await assertDirectError(response, 400, 'invalid_request');
 				});
 			});
-
 
 			test('Disallow loopback', async () => {
 				await sendEnvUpdateRequest({ key: 'MISSKEY_TEST_CHECK_IP_RANGE', value: '1' });

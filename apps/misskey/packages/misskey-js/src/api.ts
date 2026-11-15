@@ -38,14 +38,17 @@ export class APIClient {
 	public origin: string;
 	public credential: string | null | undefined;
 	public fetch: FetchLike;
+	public client: 'web-v1' | 'third-party-v1';
 
 	constructor(opts: {
 		origin: APIClient['origin'];
 		credential?: APIClient['credential'];
 		fetch?: APIClient['fetch'] | null | undefined;
+		client?: APIClient['client'];
 	}) {
 		this.origin = opts.origin.replace(/\/$/, '');
 		this.credential = opts.credential;
+		this.client = opts.client ?? 'third-party-v1';
 		// ネイティブ関数をそのまま変数に代入して使おうとするとChromiumではIllegal invocationエラーが発生するため、
 		// 環境で実装されているfetchを使う場合は無名関数でラップして使用する
 		this.fetch = opts.fetch ?? ((...args) => fetch(...args));
@@ -106,8 +109,9 @@ export class APIClient {
 			this.fetch(`${this.origin}/api/${endpoint}`, {
 				method: 'POST',
 				body: payload,
-				headers: mediaType === 'multipart/form-data' ? {} : {
-					'Content-Type': mediaType,
+				headers: {
+					'X-Camp-Client': this.client,
+					...(mediaType === 'multipart/form-data' ? {} : { 'Content-Type': mediaType }),
 				},
 				credentials: 'omit',
 				cache: 'no-cache',

@@ -5,5 +5,6 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 shellcheck -x scripts/deploy.sh scripts/backup.sh scripts/check-deploy.sh
+python3 scripts/server-release.test.py -v
 python3 scripts/deploy.test.py -v
 python3 scripts/backup.test.py -v

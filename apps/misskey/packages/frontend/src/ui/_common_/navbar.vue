@@ -5,14 +5,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <template>
 <div :class="[$style.root, { [$style.iconOnly]: iconOnly }]">
-	<div :class="$style.body">
-		<div :class="$style.top">
+	<div :class="$style.body" data-camp-sidebar="navigation">
+		<div :class="$style.top" data-camp-window-drag>
 			<button v-tooltip.noDelay.right="instance.name ?? i18n.ts.instance" class="_button" :class="$style.instance" @click="openInstanceMenu">
 				<img :src="instance.iconUrl || '/favicon.ico'" alt="" :class="$style.instanceIcon" style="view-transition-name: navbar-serverIcon;"/>
-			</button>
-			<button v-if="!iconOnly" v-tooltip.noDelay.right="i18n.ts.realtimeMode" class="_button" :class="[$style.realtimeMode, store.r.realtimeMode.value ? $style.on : null]" @click="toggleRealtimeMode">
-				<i v-if="store.r.realtimeMode.value" class="ti ti-bolt ti-fw"></i>
-				<i v-else class="ti ti-bolt-off ti-fw"></i>
 			</button>
 			<button v-if="!iconOnly && showWidgetButton" v-tooltip.noDelay.right="i18n.ts.widgets" class="_button" :class="[$style.widget]" @click="() => emit('widgetButtonClick')">
 				<i class="ti ti-apps ti-fw"></i>
@@ -56,10 +52,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<div :class="$style.bottom">
 			<button v-if="iconOnly && showWidgetButton" v-tooltip.noDelay.right="i18n.ts.widgets" class="_button" :class="[$style.widget]" @click="() => emit('widgetButtonClick')">
 				<i class="ti ti-apps ti-fw"></i>
-			</button>
-			<button v-if="iconOnly" v-tooltip.noDelay.right="i18n.ts.realtimeMode" class="_button" :class="[$style.realtimeMode, store.r.realtimeMode.value ? $style.on : null]" @click="toggleRealtimeMode">
-				<i v-if="store.r.realtimeMode.value" class="ti ti-bolt ti-fw"></i>
-				<i v-else class="ti ti-bolt-off ti-fw"></i>
 			</button>
 			<button v-tooltip.noDelay.right="i18n.ts.note" class="_button" :class="[$style.post]" data-testid="open-post-form" @click="() => { os.post(); }">
 				<i class="ti ti-pencil ti-fw" :class="$style.postIcon"></i><span :class="$style.postText">{{ i18n.ts.note }}</span>
@@ -161,20 +153,6 @@ function toggleIconOnly() {
 	}
 }
 
-function toggleRealtimeMode(ev: PointerEvent) {
-	os.popupMenu([{
-		type: 'label',
-		text: i18n.ts.realtimeMode,
-	}, {
-		text: store.s.realtimeMode ? i18n.ts.turnItOff : i18n.ts.turnItOn,
-		icon: store.s.realtimeMode ? 'ti ti-bolt-off' : 'ti ti-bolt',
-		action: () => {
-			store.set('realtimeMode', !store.s.realtimeMode);
-			window.location.reload();
-		},
-	}], ev.currentTarget ?? ev.target);
-}
-
 async function openAccountMenu(ev: PointerEvent) {
 	const menuItems = await getAccountMenu({
 		withExtraOperation: true,
@@ -227,6 +205,14 @@ function menuEdit() {
 	flex-direction: column;
 
 	direction: rtl; /* スクロールバーを左に表示したいため */
+}
+
+:global(html[data-camp-desktop="true"] [data-camp-sidebar="navigation"]) {
+	scrollbar-width: none;
+
+	&::-webkit-scrollbar {
+		display: none;
+	}
 }
 
 .top {
@@ -322,6 +308,19 @@ function menuEdit() {
 			rgb(0 0 0 / 95.1%) 91.9%,
 			rgb(0 0 0 / 100%) 100%
 		);
+	}
+}
+
+:global(html[data-camp-desktop="true"]) {
+	.top,
+	.bottom {
+		z-index: 1;
+		background: var(--MI_THEME-navBg);
+
+		&::before,
+		&::after {
+			display: none;
+		}
 	}
 }
 
@@ -427,16 +426,6 @@ function menuEdit() {
 		width: 38px;
 		aspect-ratio: 1;
 		border-radius: 8px;
-	}
-
-	.realtimeMode {
-		display: inline-block;
-		width: var(--top-height);
-		margin-left: auto;
-
-		&.on {
-			color: var(--MI_THEME-accent);
-		}
 	}
 
 	.widget {
@@ -672,18 +661,6 @@ function menuEdit() {
 		width: 100%;
 		height: 52px;
 		text-align: center;
-	}
-
-	.realtimeMode {
-		display: block;
-		position: relative;
-		width: 100%;
-		height: 52px;
-		text-align: center;
-
-		&.on {
-			color: var(--MI_THEME-accent);
-		}
 	}
 
 	.post {

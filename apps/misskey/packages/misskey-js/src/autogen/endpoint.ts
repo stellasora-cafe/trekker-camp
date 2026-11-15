@@ -273,6 +273,14 @@ import type {
 	ChatRoomsShowResponse,
 	ChatRoomsUpdateRequest,
 	ChatRoomsUpdateResponse,
+	ClientAuthApproveRequest,
+	ClientAuthCheckRequest,
+	ClientAuthCheckResponse,
+	ClientAuthShowRequest,
+	ClientAuthShowResponse,
+	ClientAuthStartRequest,
+	ClientAuthStartResponse,
+	ClientResourcesResponse,
 	ClipsAddNoteRequest,
 	ClipsCreateRequest,
 	ClipsCreateResponse,
@@ -427,6 +435,7 @@ import type {
 	IAuthorizedAppsResponse,
 	IChangePasswordRequest,
 	IClaimAchievementRequest,
+	IClientSessionsResponse,
 	IDeleteAccountRequest,
 	IExportFollowingRequest,
 	IFavoritesRequest,
@@ -467,6 +476,7 @@ import type {
 	IRegistryRemoveRequest,
 	IRegistryScopesWithDomainResponse,
 	IRegistrySetRequest,
+	IRevokeClientSessionRequest,
 	IRevokeTokenRequest,
 	ISigninHistoryRequest,
 	ISigninHistoryResponse,
@@ -478,6 +488,8 @@ import type {
 	IUpdateEmailResponse,
 	IUpdatePhoneRequest,
 	IUpdatePhoneResponse,
+	IUpgradeClientSessionRequest,
+	IUpgradeClientSessionResponse,
 	IWebhooksCreateRequest,
 	IWebhooksCreateResponse,
 	IWebhooksDeleteRequest,
@@ -858,6 +870,11 @@ export type Endpoints = {
 	'chat/rooms/owned': { req: ChatRoomsOwnedRequest; res: ChatRoomsOwnedResponse };
 	'chat/rooms/show': { req: ChatRoomsShowRequest; res: ChatRoomsShowResponse };
 	'chat/rooms/update': { req: ChatRoomsUpdateRequest; res: ChatRoomsUpdateResponse };
+	'client-auth/approve': { req: ClientAuthApproveRequest; res: EmptyResponse };
+	'client-auth/check': { req: ClientAuthCheckRequest; res: ClientAuthCheckResponse };
+	'client-auth/show': { req: ClientAuthShowRequest; res: ClientAuthShowResponse };
+	'client-auth/start': { req: ClientAuthStartRequest; res: ClientAuthStartResponse };
+	'client-resources': { req: EmptyRequest; res: ClientResourcesResponse };
 	'clips/add-note': { req: ClipsAddNoteRequest; res: EmptyResponse };
 	'clips/create': { req: ClipsCreateRequest; res: ClipsCreateResponse };
 	'clips/delete': { req: ClipsDeleteRequest; res: EmptyResponse };
@@ -953,6 +970,7 @@ export type Endpoints = {
 	'i/authorized-apps': { req: IAuthorizedAppsRequest; res: IAuthorizedAppsResponse };
 	'i/change-password': { req: IChangePasswordRequest; res: EmptyResponse };
 	'i/claim-achievement': { req: IClaimAchievementRequest; res: EmptyResponse };
+	'i/client-sessions': { req: EmptyRequest; res: IClientSessionsResponse };
 	'i/delete-account': { req: IDeleteAccountRequest; res: EmptyResponse };
 	'i/export-antennas': { req: EmptyRequest; res: EmptyResponse };
 	'i/export-blocking': { req: EmptyRequest; res: EmptyResponse };
@@ -986,12 +1004,14 @@ export type Endpoints = {
 	'i/registry/remove': { req: IRegistryRemoveRequest; res: EmptyResponse };
 	'i/registry/scopes-with-domain': { req: EmptyRequest; res: IRegistryScopesWithDomainResponse };
 	'i/registry/set': { req: IRegistrySetRequest; res: EmptyResponse };
+	'i/revoke-client-session': { req: IRevokeClientSessionRequest; res: EmptyResponse };
 	'i/revoke-token': { req: IRevokeTokenRequest; res: EmptyResponse };
 	'i/signin-history': { req: ISigninHistoryRequest; res: ISigninHistoryResponse };
 	'i/unpin': { req: IUnpinRequest; res: IUnpinResponse };
 	'i/update': { req: IUpdateRequest; res: IUpdateResponse };
 	'i/update-email': { req: IUpdateEmailRequest; res: IUpdateEmailResponse };
 	'i/update-phone': { req: IUpdatePhoneRequest; res: IUpdatePhoneResponse };
+	'i/upgrade-client-session': { req: IUpgradeClientSessionRequest; res: IUpgradeClientSessionResponse };
 	'i/webhooks/create': { req: IWebhooksCreateRequest; res: IWebhooksCreateResponse };
 	'i/webhooks/delete': { req: IWebhooksDeleteRequest; res: EmptyResponse };
 	'i/webhooks/list': { req: EmptyRequest; res: IWebhooksListResponse };

@@ -310,7 +310,44 @@ async function fetchMore() {
 	moreFetching.value = false;
 }
 
+let recoveryTouched: Set<string> | null = null;
+let recoveryDisposed = false;
+
+async function recoverMessages() {
+	if (!initialized.value || recoveryTouched) return;
+	const touched = new Set<string>();
+	recoveryTouched = touched;
+	const oldest = messages.value.map(message => message.id).sort().at(0);
+	const recovered: NormalizedChatMessage[] = [];
+	let untilId: string | undefined;
+	try {
+		while (!recoveryDisposed) {
+			const page = props.userId
+				? await misskeyApi('chat/messages/user-timeline', { userId: props.userId, limit: 100, untilId })
+				: await misskeyApi('chat/messages/room-timeline', { roomId: props.roomId!, limit: 100, untilId });
+			recovered.push(...page.map(normalizeMessage));
+			const next = page.map(message => message.id).sort().at(0);
+			if (page.length < 100 || next == null || oldest == null || next <= oldest || next === untilId) break;
+			untilId = next;
+		}
+		if (recoveryDisposed) return;
+		const latest = new Map(messages.value.map(message => [message.id, message]));
+		const merged = new Map<string, NormalizedChatMessage>();
+		for (const message of recovered) {
+			if (oldest != null && message.id < oldest) continue;
+			const current = touched.has(message.id) ? latest.get(message.id) : message;
+			if (current) merged.set(message.id, current);
+		}
+		for (const message of messages.value) {
+			if (touched.has(message.id) || (oldest != null && message.id < oldest)) merged.set(message.id, message);
+		}
+		messages.value = [...merged.values()].sort((a, b) => a.id > b.id ? -1 : a.id < b.id ? 1 : 0);
+	} catch { /* Keep the current conversation and draft during reconnect. */ } finally { recoveryTouched = null; }
+}
+
 function onMessage(message: Misskey.entities.ChatMessageLite) {
+	recoveryTouched?.add(message.id);
+	if (messages.value.some(item => item.id === message.id)) return;
 	sound.playMisskeySfx('chatMessage');
 
 	messages.value.unshift(normalizeMessage(message));
@@ -328,6 +365,7 @@ function onMessage(message: Misskey.entities.ChatMessageLite) {
 }
 
 function onDeleted(id: string) {
+	recoveryTouched?.add(id);
 	const index = messages.value.findIndex(m => m.id === id);
 	if (index !== -1) {
 		messages.value.splice(index, 1);
@@ -335,6 +373,7 @@ function onDeleted(id: string) {
 }
 
 function onReact(ctx: Parameters<Misskey.Channels['chatUser']['events']['react']>[0] | Parameters<Misskey.Channels['chatRoom']['events']['react']>[0]) {
+	recoveryTouched?.add(ctx.messageId);
 	const message = messages.value.find(m => m.id === ctx.messageId);
 	if (message) {
 		if (room.value == null) { // 1on1の時はuserは省略される
@@ -352,6 +391,7 @@ function onReact(ctx: Parameters<Misskey.Channels['chatUser']['events']['react']
 }
 
 function onUnreact(ctx: Parameters<Misskey.Channels['chatUser']['events']['unreact']>[0] | Parameters<Misskey.Channels['chatRoom']['events']['unreact']>[0]) {
+	recoveryTouched?.add(ctx.messageId);
 	const message = messages.value.find(m => m.id === ctx.messageId);
 	if (message) {
 		const index = message.reactions.findIndex(r => r.reaction === ctx.reaction && r.user.id === ctx.user!.id);
@@ -375,6 +415,7 @@ function onVisibilitychange() {
 }
 
 onMounted(() => {
+	useStream().on('_reconnected_', recoverMessages);
 	initialize();
 });
 
@@ -385,6 +426,8 @@ onActivated(() => {
 });
 
 onBeforeUnmount(() => {
+	recoveryDisposed = true;
+	useStream().off('_reconnected_', recoverMessages);
 	connection.value?.dispose();
 	window.document.removeEventListener('visibilitychange', onVisibilitychange);
 });

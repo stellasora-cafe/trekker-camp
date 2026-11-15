@@ -5,7 +5,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <template>
 <div
+	ref="postFormRoot"
 	:class="[$style.root]"
+	:data-camp-pending-edit="text.length > 0 || files.length > 0 || uploader.items.value.length > 0 || poll != null || posting || undefined"
 	@dragover.stop="onDragover"
 	@dragenter="onDragenter"
 	@dragleave="onDragleave"
@@ -166,6 +168,7 @@ import { closeTip } from '@/tips.js';
 import { findTableAtCursor, serializeMfmTable, tsvToRows } from '@@/js/mfm-table.js';
 import { buildIndexMap, getInlineImageIndices, inlineImageToken, remapInlineImageIndices } from '@@/js/mfm-inline-image.js';
 import { createDraftAutosaver, AUTOSAVE_MIN_CHARS } from '@/utility/draft-autosave.js';
+import { registerDesktopRestartEditor } from '@/utility/desktop-update.js';
 
 const $i = ensureSignin();
 
@@ -193,6 +196,8 @@ const emit = defineEmits<{
 }>();
 
 const textareaEl = useTemplateRef('textareaEl');
+const postFormRoot = useTemplateRef('postFormRoot');
+let unregisterRestartEditor: (() => void) | undefined;
 const cwInputEl = useTemplateRef('cwInputEl');
 const hashtagsInputEl = useTemplateRef('hashtagsInputEl');
 const visibilityButton = useTemplateRef('visibilityButton');
@@ -1426,6 +1431,19 @@ function showTour() {
 }
 
 onMounted(() => {
+	if (window.document.documentElement.dataset.campDesktop === 'true' && postFormRoot.value) {
+		unregisterRestartEditor = registerDesktopRestartEditor({
+			root: postFormRoot.value,
+			key: () => draftKey.value,
+			save: () => {
+				if (posting.value || uploader.uploading.value || uploader.items.value.length > 0) return false;
+				// Reopening an edit-from-note form reapplies initialNote after draft restoration.
+				if (props.instant || props.mock || props.mention || props.specified || props.initialNote || postAccount.value) return false;
+				saveDraft();
+				return true;
+			},
+		});
+	}
 	if (props.autofocus) {
 		focus();
 
@@ -1495,6 +1513,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+	unregisterRestartEditor?.();
 	autosaver.flush().finally(() => autosaver.dispose());
 	uploader.abortAll();
 	if (textAutocomplete) {

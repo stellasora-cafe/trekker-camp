@@ -10,6 +10,7 @@ import type { MiLocalUser } from '@/models/User.js';
 import type { MiAccessToken } from '@/models/AccessToken.js';
 import { MemoryKVCache } from '@/misc/cache.js';
 import type { MiApp } from '@/models/App.js';
+import { ClientSessionService } from '@/core/ClientSessionService.js';
 import { CacheService } from '@/core/CacheService.js';
 import { isNativeUserToken } from '@/misc/token.js';
 import { bindThis } from '@/decorators.js';
@@ -35,18 +36,30 @@ export class AuthenticateService implements OnApplicationShutdown {
 		@Inject(DI.appsRepository)
 		private appsRepository: AppsRepository,
 
+		private clientSessionService: ClientSessionService,
 		private cacheService: CacheService,
 	) {
 		this.appCache = new MemoryKVCache<MiApp>(1000 * 60 * 60 * 24 * 7); // 1w
 	}
 
 	@bindThis
-	public async authenticate(token: string | null | undefined): Promise<[MiLocalUser | null, MiAccessToken | null]> {
+	public async authenticate(token: string | null | undefined, protocol?: string, clientApi = false): Promise<[MiLocalUser | null, MiAccessToken | null, string?]> {
+		if (clientApi && protocol !== 'desktop-v1') throw new AuthenticationError('client protocol required');
 		if (token == null) {
 			return [null, null];
 		}
 
+		if (!clientApi && protocol !== 'web-v1' && protocol !== 'third-party-v1') throw new AuthenticationError('client protocol required');
+		if (token.startsWith('cs_')) {
+			if (!clientApi && protocol !== 'web-v1') throw new AuthenticationError('client session is not a third-party token');
+			const result = await this.clientSessionService.authenticate(token, clientApi ? 'desktop' : 'web');
+			if (!result) throw new AuthenticationError('invalid client session');
+			return [result.user, null, result.session.id];
+		}
+		if (clientApi) throw new AuthenticationError('client session required');
+
 		if (isNativeUserToken(token)) {
+			if (protocol !== 'web-v1') throw new AuthenticationError('web credential cannot authorize a third-party client');
 			const user = await this.cacheService.localUserByNativeTokenCache.fetch(token,
 				() => this.usersRepository.findOneBy({ token }) as Promise<MiLocalUser | null>);
 
@@ -56,6 +69,7 @@ export class AuthenticateService implements OnApplicationShutdown {
 
 			return [user, null];
 		} else {
+			if (protocol !== 'third-party-v1') throw new AuthenticationError('third-party protocol required');
 			const accessToken = await this.accessTokensRepository.findOne({
 				where: [{
 					hash: token.toLowerCase(), // app

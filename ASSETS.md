@@ -4,7 +4,9 @@
 
 程序代码和独立授权的美术素材分别管理。`private-assets/` 和本地素材链接不进入公开 Git 仓库、Docker 构建上下文或源码下载包。公开仓库中的现有资源保持原有授权。
 
-团队素材仓库为 [HePudding/trekker-camp-assets](https://github.com/HePudding/trekker-camp-assets)，保持 **Private**，默认分支为 `master`。仅授权成员有权拉取；素材更新在该仓库独立提交和审查。
+服务端 Release 部署包和前端热更新 ZIP 同样不包含私有素材。服务器使用独立凭据从私有素材库同步 `public/`；仅发布文件作为只读静态资源挂载。
+
+团队素材仓库为 [stellasora-cafe/trekker-camp-assets](https://github.com/stellasora-cafe/trekker-camp-assets)，保持 **Private**，默认分支为 `master`。仅授权成员有权拉取；素材更新在该仓库独立提交和审查。
 
 ## 公开品牌与界面素材
 
@@ -49,7 +51,7 @@ pnpm dev
 
 在 `private-assets/` 中创建素材分支，添加网站资源并更新 `RIGHTS.md`，验证后向私有素材库创建 PR。程序对素材 URL 的引用在主代码仓库单独提交。主仓库的 `git add` 不会加入素材仓库。
 
-音频、视频和原稿的 LFS 规则已在私有仓库配置；新增大图片时可按需要扩展其 `.gitattributes`。具体协作和发布步骤见[私有素材仓库指南](https://github.com/HePudding/trekker-camp-assets#readme)。
+音频、视频和原稿的 LFS 规则已在私有仓库配置；新增大图片时可按需要扩展其 `.gitattributes`。具体协作和发布步骤见[私有素材仓库指南](https://github.com/stellasora-cafe/trekker-camp-assets#readme)。
 
 ### 多个 worktree 共用素材
 
@@ -108,7 +110,7 @@ CLI 管理的服务器使用 `camp update` 统一发布素材和应用；下面�
 
 ### 同步与挂载
 
-私有素材库的 [Assets 工作流](https://github.com/HePudding/trekker-camp-assets/actions/workflows/assets.yml) 已配置为：PR 验证素材；`master` 更新时验证并同步到已配置的服务器。未配置服务器时只验证，不发布。代码镜像仍只构建公开代码。
+私有素材库的 [Assets 工作流](https://github.com/stellasora-cafe/trekker-camp-assets/actions/workflows/assets.yml) 已配置为：PR 验证素材；`master` 更新时验证并同步到已配置的服务器。未配置服务器时只验证，不发布。代码镜像仍只构建公开代码。
 
 使用现有的 `compose.yml` 应用配置，附加仓库提供的 `compose.assets.yml`。素材目录由运行时只读挂载，镜像构建不读取它。
 

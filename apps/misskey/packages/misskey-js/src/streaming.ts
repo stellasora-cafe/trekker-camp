@@ -22,6 +22,9 @@ type AnyOf<T extends Record<PropertyKey, unknown>> = T[keyof T];
 export type StreamEvents = {
 	_connected_: void;
 	_disconnected_: void;
+	_reconnected_: void;
+	_authenticationFailed_: void;
+	_pong_: void;
 } & BroadcastEvents;
 
 export interface IStream extends EventEmitter<StreamEvents> {
@@ -37,6 +40,7 @@ export interface IStream extends EventEmitter<StreamEvents> {
 	send(typeOrPayload: string | Record<string, unknown> | unknown[], payload?: unknown): void;
 	ping(): void;
 	heartbeat(): void;
+	reconnect(force?: boolean): void;
 	close(): void;
 }
 
@@ -51,10 +55,12 @@ export default class Stream extends EventEmitter<StreamEvents> implements IStrea
 	private sharedConnections: SharedConnection[] = [];
 	private nonSharedConnections: NonSharedConnection[] = [];
 	private idCounter = 0;
+	private closed = false;
 
 	constructor(origin: string, user: { token: string; } | null, options?: {
 		WebSocket?: Options['WebSocket'];
 		binaryType?: ReconnectingWebSocket['binaryType'];
+		client?: 'web-v1' | 'third-party-v1';
 	}) {
 		super();
 
@@ -76,6 +82,7 @@ export default class Stream extends EventEmitter<StreamEvents> implements IStrea
 
 		const query = urlQuery({
 			i: user?.token,
+			client: options.client ?? 'third-party-v1',
 
 			// To prevent cache of an HTML such as error screen
 			_t: Date.now(),
@@ -84,7 +91,11 @@ export default class Stream extends EventEmitter<StreamEvents> implements IStrea
 		const wsOrigin = origin.replace('http://', 'ws://').replace('https://', 'wss://');
 
 		this.stream = new ReconnectingWebSocketConstructor(`${wsOrigin}/streaming?${query}`, '', {
-			minReconnectionDelay: 1, // https://github.com/pladaria/reconnecting-websocket/issues/91
+			minReconnectionDelay: 250 + Math.random() * 250,
+			maxReconnectionDelay: 3000,
+			reconnectionDelayGrowFactor: 1.6,
+			connectionTimeout: 4000,
+			minUptime: 5000,
 			WebSocket: options.WebSocket,
 		});
 		if (options.binaryType) {
@@ -145,19 +156,25 @@ export default class Stream extends EventEmitter<StreamEvents> implements IStrea
 		const isReconnect = this.state === 'reconnecting';
 
 		this.state = 'connected';
-		this.emit('_connected_');
 
 		// チャンネル再接続
 		if (isReconnect) {
 			for (const p of this.sharedConnectionPools) p.connect();
 			for (const c of this.nonSharedConnections) c.connect();
 		}
+		this.emit('_connected_');
+		if (isReconnect) this.emit('_reconnected_');
 	}
 
 	/**
 	 * Callback of when close connection
 	 */
-	private onClose(): void {
+	private onClose(event: { code: number }): void {
+		if (event.code === 4001) {
+			this.close();
+			this.emit('_authenticationFailed_');
+			return;
+		}
 		if (this.state === 'connected') {
 			this.state = 'reconnecting';
 			this.emit('_disconnected_');
@@ -169,6 +186,10 @@ export default class Stream extends EventEmitter<StreamEvents> implements IStrea
 	 */
 	private onMessage(message: { data: string; }): void {
 		const { type, body } = JSON.parse(message.data);
+		if (type === 'pong') {
+			this.emit('_pong_');
+			return;
+		}
 
 		if (type === 'channel') {
 			const id = body.id;
@@ -213,17 +234,22 @@ export default class Stream extends EventEmitter<StreamEvents> implements IStrea
 	}
 
 	public ping(): void {
-		this.stream.send('ping');
+		this.send('ping');
 	}
 
 	public heartbeat(): void {
 		this.stream.send('h');
 	}
 
+	public reconnect(force = false): void {
+		if (!this.closed && (force || this.state !== 'connected')) this.stream.reconnect();
+	}
+
 	/**
 	 * Close this connection
 	 */
 	public close(): void {
+		this.closed = true;
 		this.stream.close();
 	}
 }

@@ -11,7 +11,7 @@ description: 用户要求为旅人营地创建 Issue 或 PR 时使用，遵循�
 
 用户明确要求创建后，完成必要的实现和验证，按授权创建。已有明确需求时无需另建 Issue，也无需反复请求同一授权。用户未要求时不创建、不评论、不合并或关闭。
 
-目标仓库为 `HePudding/trekker-camp`，PR 默认合入 `master`。先查看现有记录，避免重复。安全问题按 [SECURITY.md](../../../SECURITY.md) 私下处理，不通过公开 Issue、PR 或评论披露；AI 不自行提交安全报告。
+目标仓库为 `stellasora-cafe/trekker-camp`，PR 默认合入 `master`。先查看现有记录，避免重复。安全问题按 [SECURITY.md](../../../SECURITY.md) 私下处理，不通过公开 Issue、PR 或评论披露；AI 不自行提交安全报告。
 
 ## Issue
 

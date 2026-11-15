@@ -14,13 +14,13 @@ SPDX-License-Identifier: AGPL-3.0-only
 >
 	<div v-if="showing" ref="rootEl" :class="[$style.root, { [$style.maximized]: maximized }]">
 		<div :class="$style.body" class="_shadow" @pointerdown="onBodyPointerDown" @keydown="onKeydown">
-			<div :class="[$style.header, { [$style.mini]: mini }]" @contextmenu.prevent.stop="onContextmenu">
+			<div ref="header" :class="[$style.header, { [$style.mini]: mini, '_campWindowHeader': maximized && customChrome }]" :data-camp-no-drag="maximized && customChrome ? undefined : ''" :data-camp-window-drag="maximized && customChrome ? '' : undefined" @contextmenu.prevent.stop="onContextmenu">
 				<span :class="$style.headerLeft">
 					<template v-if="!minimized">
 						<button v-for="button in buttonsLeft" v-tooltip="button.title" class="_button" :class="[$style.headerButton, { [$style.highlighted]: button.highlighted }]" @click="button.onClick"><i :class="button.icon"></i></button>
 					</template>
 				</span>
-				<span :class="$style.headerTitle" @pointerdown.prevent="onHeaderPointerdown">
+				<span :class="$style.headerTitle" data-camp-no-drag @pointerdown.prevent="onHeaderPointerdown">
 					<slot name="header"></slot>
 				</span>
 				<span :class="$style.headerRight">
@@ -59,6 +59,8 @@ import { elementContains } from '@/utility/element-contains.js';
 import * as os from '@/os.js';
 import { i18n } from '@/i18n.js';
 import { prefer } from '@/preferences.js';
+import { useDesktopControlsInset } from '@/composables/use-desktop-controls-inset.js';
+import { hasDesktopWindowChrome } from '@/utility/desktop-window.js';
 
 type WindowButton = {
 	title: string;
@@ -140,6 +142,9 @@ const INITIAL_WINDOW_HEIGHT_MIN = 500; // スクリーンの最小幅に合わ�
 provide('inWindow', true);
 
 const rootEl = useTemplateRef('rootEl');
+const customChrome = hasDesktopWindowChrome();
+const header = useTemplateRef('header');
+const controlsInset = useDesktopControlsInset(header);
 const showing = ref(true);
 let beforeClickedAt = 0;
 const maximized = ref(false);
@@ -562,6 +567,8 @@ defineExpose({
 }
 
 .header {
+	box-sizing: border-box;
+	padding-right: v-bind("controlsInset + 'px'");
 	--height: 39px;
 
 	display: flex;
@@ -601,6 +608,10 @@ defineExpose({
 
 .headerRight {
 	min-width: 16px;
+}
+
+:global(html[data-camp-window-chrome="true"]) .maximized .header {
+	--height: 50px;
 }
 
 .headerTitle {

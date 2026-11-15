@@ -66,6 +66,7 @@ import { MiRetentionAggregation } from '@/models/RetentionAggregation.js';
 import { MiReversiGame } from '@/models/ReversiGame.js';
 import { MiRole } from '@/models/Role.js';
 import { MiRoleAssignment } from '@/models/RoleAssignment.js';
+import { MiClientSession } from '@/models/ClientSession.js';
 import { MiSignin } from '@/models/Signin.js';
 import { MiSwSubscription } from '@/models/SwSubscription.js';
 import { MiSystemAccount } from '@/models/SystemAccount.js';
@@ -142,6 +143,7 @@ export {
 	MiRegistrationTicket,
 	MiRegistryItem,
 	MiRelay,
+	MiClientSession,
 	MiSignin,
 	MiSwSubscription,
 	MiSystemAccount,
@@ -222,6 +224,7 @@ export type PromoReadsRepository = Repository<MiPromoRead> & MiRepository<MiProm
 export type RegistrationTicketsRepository = Repository<MiRegistrationTicket> & MiRepository<MiRegistrationTicket>;
 export type RegistryItemsRepository = Repository<MiRegistryItem> & MiRepository<MiRegistryItem>;
 export type RelaysRepository = Repository<MiRelay> & MiRepository<MiRelay>;
+export type ClientSessionsRepository = Repository<MiClientSession> & MiRepository<MiClientSession>;
 export type SigninsRepository = Repository<MiSignin> & MiRepository<MiSignin>;
 export type SwSubscriptionsRepository = Repository<MiSwSubscription> & MiRepository<MiSwSubscription>;
 export type SystemAccountsRepository = Repository<MiSystemAccount> & MiRepository<MiSystemAccount>;

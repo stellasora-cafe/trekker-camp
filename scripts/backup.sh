@@ -104,8 +104,15 @@ r2_backup() (
 	cp -al "$data_dir/files" "$backup_dir/files"
 	cp -al "$assets_dir/public" "$backup_dir/assets"
 	cp -a "$config_dir" "$backup_dir/config"
-	cp "$camp_dir/compose.yml" "$camp_dir/compose.assets.yml" "$backup_dir/"
-	git -C "$camp_dir" rev-parse HEAD > "$backup_dir/code-revision"
+	cp "$camp_dir/compose.yml" "${release_source:-$camp_dir}/compose.assets.yml" "$backup_dir/"
+	if [[ -n ${release_source:-} ]]; then
+		cp "$release_source/RELEASE.json" "$release_source/compose.release.yml" "$backup_dir/"
+	fi
+	if [[ -n ${release_source:-} ]]; then
+		python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["commit"])' "$release_source/RELEASE.json" > "$backup_dir/code-revision"
+	else
+		git -C "$camp_dir" rev-parse HEAD > "$backup_dir/code-revision"
+	fi
 	# shellcheck disable=SC2016
 	compose exec -T db sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup_dir/database.dump"
 	[[ -s $backup_dir/database.dump ]] || fail '数据库备份为空，停止上传。'

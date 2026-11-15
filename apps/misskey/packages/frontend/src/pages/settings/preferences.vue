@@ -44,26 +44,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 							</MkRadios>
 						</SearchMarker>
 
-						<SearchMarker :keywords="['realtimemode']">
-							<MkSwitch v-model="realtimeMode">
-								<template #label><i class="ti ti-bolt"></i> <SearchLabel>{{ i18n.ts.realtimeMode }}</SearchLabel></template>
-								<template #caption><SearchText>{{ i18n.ts._settings.realtimeMode_description }}</SearchText></template>
-							</MkSwitch>
-						</SearchMarker>
-
-						<MkDisableSection :disabled="realtimeMode">
-							<SearchMarker :keywords="['polling', 'interval']">
-								<MkPreferenceContainer k="pollingInterval">
-									<MkRange v-model="pollingInterval" :min="1" :max="3" :step="1" easing :showTicks="true" :textConverter="(v) => v === 1 ? i18n.ts.low : v === 2 ? i18n.ts.middle : v === 3 ? i18n.ts.high : ''">
-										<template #label><SearchLabel>{{ i18n.ts._settings.contentsUpdateFrequency }}</SearchLabel></template>
-										<template #caption><SearchText>{{ i18n.ts._settings.contentsUpdateFrequency_description }}</SearchText><br><SearchText>{{ i18n.ts._settings.contentsUpdateFrequency_description2 }}</SearchText></template>
-										<template #prefix><i class="ti ti-player-play"></i></template>
-										<template #suffix><i class="ti ti-player-track-next"></i></template>
-									</MkRange>
-								</MkPreferenceContainer>
-							</SearchMarker>
-						</MkDisableSection>
-
 						<div class="_gaps_s">
 							<SearchMarker :keywords="['titlebar', 'show']">
 								<MkPreferenceContainer k="showTitlebar">
@@ -688,15 +668,15 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<MkInfo>
 							<div class="_gaps_s">
 								<div>{{ i18n.ts._clientPerformanceIssueTip.title }}:</div>
-								<div>
+								<div v-if="!isDesktopClient()">
 									<div><b>{{ i18n.ts._clientPerformanceIssueTip.makeSureDisabledAdBlocker }}</b></div>
 									<div>{{ i18n.ts._clientPerformanceIssueTip.makeSureDisabledAdBlocker_description }}</div>
 								</div>
 								<div>
 									<div><b>{{ i18n.ts._clientPerformanceIssueTip.makeSureDisabledCustomCss }}</b></div>
-									<div>{{ i18n.ts._clientPerformanceIssueTip.makeSureDisabledCustomCss_description }}</div>
+									<div>{{ isDesktopClient() ? i18n.ts._clientPerformanceIssueTip.makeSureDisabledCustomCss_desktopDescription : i18n.ts._clientPerformanceIssueTip.makeSureDisabledCustomCss_description }}</div>
 								</div>
-								<div>
+								<div v-if="!isDesktopClient()">
 									<div><b>{{ i18n.ts._clientPerformanceIssueTip.makeSureDisabledAddons }}</b></div>
 									<div>{{ i18n.ts._clientPerformanceIssueTip.makeSureDisabledAddons_description }}</div>
 								</div>
@@ -792,21 +772,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 							</SearchMarker>
 						</div>
 
-						<SearchMarker :keywords="['server', 'disconnect', 'reconnect', 'reload', 'streaming']">
-							<MkPreferenceContainer k="serverDisconnectedBehavior">
-								<MkSelect
-									v-model="serverDisconnectedBehavior"
-									:items="[
-										{ label: i18n.ts._serverDisconnectedBehavior.reload, value: 'reload' },
-										{ label: i18n.ts._serverDisconnectedBehavior.dialog, value: 'dialog' },
-										{ label: i18n.ts._serverDisconnectedBehavior.quiet, value: 'quiet' },
-									]"
-								>
-									<template #label><SearchLabel>{{ i18n.ts.whenServerDisconnected }}</SearchLabel></template>
-								</MkSelect>
-							</MkPreferenceContainer>
-						</SearchMarker>
-
 						<SearchMarker :keywords="['cache', 'page']">
 							<MkPreferenceContainer k="numberOfPageCache">
 								<MkRange v-model="numberOfPageCache" :min="1" :max="10" :step="1" easing>
@@ -896,18 +861,16 @@ import { instance } from '@/instance.js';
 import { ensureSignin } from '@/i.js';
 import { genId } from '@/utility/id.js';
 import { suggestReload } from '@/utility/reload-suggest.js';
+import { isDesktopClient } from '@/utility/offline.js';
 
 const $i = ensureSignin();
 
 const lang = ref(miLocalStorage.getItem('lang'));
 const dataSaver = ref(prefer.s.dataSaver);
-const realtimeMode = store.model('realtimeMode');
 
 const overridedDeviceKind = prefer.model('overridedDeviceKind');
-const pollingInterval = prefer.model('pollingInterval');
 const showTitlebar = prefer.model('showTitlebar');
 const keepCw = prefer.model('keepCw');
-const serverDisconnectedBehavior = prefer.model('serverDisconnectedBehavior');
 const hemisphere = prefer.model('hemisphere');
 const showNoteActionsOnlyHover = prefer.model('showNoteActionsOnlyHover');
 const showClipButtonInNoteFooter = prefer.model('showClipButtonInNoteFooter');
@@ -990,8 +953,6 @@ watch(useSystemFont, () => {
 watch([
 	hemisphere,
 	lang,
-	realtimeMode,
-	pollingInterval,
 	enableInfiniteScroll,
 	showNoteActionsOnlyHover,
 	overridedDeviceKind,

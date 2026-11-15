@@ -10,6 +10,22 @@ import * as os from '@/os.js';
 import { instance } from '@/instance.js';
 import { i18n } from '@/i18n.js';
 import { $i } from '@/i.js';
+import { checkDesktopUpdates, desktopWindowMode, openDesktopAbout, openDesktopTool } from '@/utility/desktop-window.js';
+
+function instanceMenuForWindow(items: MenuItem[]): MenuItem[] {
+	if ($i || desktopWindowMode() === 'browser') return items;
+	return items.map(item => {
+		if (!('type' in item)) return item;
+		if (item.type === 'link') {
+			const { type, to, ...label } = item;
+			return { ...label, type: 'button', action: () => openDesktopTool(to) };
+		}
+		if (item.type === 'parent' && Array.isArray(item.children)) {
+			return { ...item, children: instanceMenuForWindow(item.children) };
+		}
+		return item;
+	});
+}
 
 function toolsMenuItems(): MenuItem[] {
 	const items: MenuItem[] = [{
@@ -164,19 +180,31 @@ export function openInstanceMenu(ev: PointerEvent) {
 		});
 	}
 
-	menuItems.push({
+	menuItems.push(desktopWindowMode() === 'browser' ? {
 		type: 'link',
-		text: i18n.ts.aboutMisskey,
-		to: '/about-misskey',
+		text: i18n.ts.aboutCamp,
+		to: '/about-camp',
+	} : {
+		type: 'button',
+		text: i18n.ts.aboutCamp,
+		action: openDesktopAbout,
 	});
+	if (desktopWindowMode() !== 'browser') {
+		menuItems.push({
+			type: 'button',
+			text: i18n.ts._desktop.checkUpdates,
+			icon: 'ti ti-refresh',
+			action: checkDesktopUpdates,
+		});
+	}
 
-	os.popupMenu(menuItems, ev.currentTarget ?? ev.target, {
+	os.popupMenu(instanceMenuForWindow(menuItems), ev.currentTarget ?? ev.target, {
 		align: 'left',
 	});
 }
 
 export function openToolsMenu(ev: PointerEvent) {
-	os.popupMenu(toolsMenuItems(), ev.currentTarget ?? ev.target, {
+	os.popupMenu(instanceMenuForWindow(toolsMenuItems()), ev.currentTarget ?? ev.target, {
 		align: 'left',
 	});
 }

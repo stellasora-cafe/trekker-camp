@@ -27,7 +27,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { computed, useTemplateRef } from 'vue';
+import { computed, provide, useTemplateRef } from 'vue';
 import { scrollInContainer } from '@@/js/scroll.js';
 import type { PageHeaderProps } from './MkPageHeader.vue';
 import { useScrollPositionKeeper } from '@/composables/use-scroll-position-keeper.js';
@@ -55,6 +55,7 @@ const pageHeaderPropsWithoutTabs = computed(() => {
 });
 
 const tab = defineModel<string>('tab');
+provide('pageHeaderProvided', true);
 const rootEl = useTemplateRef('rootEl');
 
 useScrollPositionKeeper(rootEl);

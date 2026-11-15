@@ -43,7 +43,9 @@ import { AnnouncementEntityService } from '@/core/entities/AnnouncementEntitySer
 import { FeedService } from './FeedService.js';
 import { UrlPreviewService } from './UrlPreviewService.js';
 import { ClientLoggerService } from './ClientLoggerService.js';
+import { ClientResourcesService } from '@/core/ClientResourcesService.js';
 import { HtmlTemplateService } from './HtmlTemplateService.js';
+import { registerDesktopManifest } from './desktop-frontend.js';
 
 import { BasePage } from './views/base.js';
 import { htmlToPlainText } from '@/misc/html-to-plain-text.js';
@@ -127,6 +129,7 @@ export class ClientServerService {
 		private feedService: FeedService,
 		private htmlTemplateService: HtmlTemplateService,
 		private clientLoggerService: ClientLoggerService,
+		private clientResourcesService: ClientResourcesService,
 	) {
 		//this.createServer = this.createServer.bind(this);
 		const backendRootdir = resolve(this.config.rootDir, 'packages/backend');
@@ -212,7 +215,20 @@ export class ClientServerService {
 			done();
 		});
 
+		registerDesktopManifest(fastify, resolve(this.config.rootDir, 'built/_desktop_frontend_'), this.config.version);
+
 		//#region vite assets
+		fastify.register(fastifyStatic, {
+			root: resolve(this.config.rootDir, 'built/_desktop_frontend_'),
+			prefix: '/_desktop/frontend/',
+			allowedPath: pathname => /^\/[a-f0-9]{64}\.zip$/.test(pathname),
+			decorateReply: false,
+			index: false,
+			setHeaders: (response, filePath) => {
+				response.header('Cache-Control', filePath.endsWith('manifest.json') ? 'no-store' : 'public, max-age=31536000, immutable');
+				response.header('X-Content-Type-Options', 'nosniff');
+			},
+		});
 		if (this.config.frontendEmbedManifestExists) {
 			this.clientLoggerService.logger.info(`[ClientServerService] Using built frontend vite assets. ${this.frontendViteOut}`);
 			fastify.register((fastify, options, done) => {
@@ -256,6 +272,7 @@ export class ClientServerService {
 		//#endregion
 
 		//#region static assets
+		this.clientResourcesService.watch();
 
 		fastify.get('/favicon.ico', async (request, reply) => {
 			return reply.sendFile('trekker-camp/branding/favicon-v1.ico', this.clientAssets, { maxAge: ms('7 days') });

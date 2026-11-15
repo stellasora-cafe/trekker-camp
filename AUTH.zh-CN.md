@@ -6,6 +6,51 @@
 
 升级保留已有账号的密码和两步验证，并为已保存完整短信凭据和签名的站点保留手机验证码开启状态；新安装默认关闭。手机验证码开启时，已有账号可在「设置 → 手机号」绑定号码；换绑需要验证新旧手机号，并确认密码及已开启的两步验证。关闭后隐藏手机设置、停用短信发送、换绑和短信找回，已发出的短信验证码也会被拒绝。手机号对其他旅人不可见，本人界面显示脱敏号码。首次管理员初始化及管理员创建账号保留现有入口。
 
+## 客户端会话与第三方 API
+
+网页登录与旅人营地客户端各自使用独立设备会话。密码、人机验证、TOTP、备用码和安全密钥沿用同一登录流程；原生客户端还支持从已登录的浏览器授权。浏览器授权请求十分钟内有效，只能领取一次。设置中的「登录设备」显示设备类型、系统、登录时间和最近活动，可退出指定设备；撤销会话会同步关闭该设备的实时连接。
+
+请求入口按以下协议区分：
+
+| 调用方 | 业务入口 | 请求头 | 实时连接 |
+| --- | --- | --- | --- |
+| 网页 | `/api/<endpoint>` | `X-Camp-Client: web-v1` | `/streaming?client=web-v1` |
+| 旅人营地客户端 | `/api/client/<endpoint>` | `X-Camp-Client: desktop-v1` | `/client-streaming` |
+| 第三方应用 | `/api/<endpoint>` | `X-Camp-Client: third-party-v1` | `/streaming?client=third-party-v1` |
+
+客户端使用 `Authorization: Bearer <设备会话>`。第三方继续使用原有 OAuth／MiAuth 权限范围与授权管理，同时须发送第三方协议请求头；OAuth 令牌兑换同样需要该请求头。未声明协议的普通 Misskey 客户端授权请求会被拒绝。匿名公开读取保持开放，请求头本身不授予账号权限。第三方凭证与设备会话分别验证，不能混用入口。
+
+### 桌面版本握手
+
+客户端首次启动和检查前端更新时，请求 `GET /_desktop/frontend/manifest.json`，并发送：
+
+```http
+X-Camp-Desktop-Version: 0.1.0
+X-Camp-Host-Api: 2
+```
+
+版本号是安装的桌面宿主版本；`X-Camp-Host-Api` 是该宿主支持的前端协议版本。当前服务端要求宿主版本至少为 `0.1.0`、协议恰为 `2`。这些要求由 `apps/misskey/packages/backend/src/server/desktop-compatibility.ts` 统一维护。兼容响应包含原有 `revision`、`sha256`、`size`、`archive` 字段，以及 `minimumVersion`、`hostApi`、`serverVersion`。清单不缓存；归档仍按哈希下载。前端尚未发布或归档声明的协议与当前服务端不一致时返回 HTTP 503，客户端保留重试入口。
+
+所有 `/api/client/<endpoint>` 请求在 `X-Camp-Client: desktop-v1` 之外也必须携带上述两个版本请求头。实时连接 `/client-streaming` 支持相同请求头；标准 WebSocket API 通过查询参数发送版本，例如 `/client-streaming?client=desktop-v1&desktopVersion=0.1.0&hostApi=2`。请求头优先，显式的不兼容请求头不会被查询参数覆盖。
+
+缺少版本信息、宿主版本过低或协议不兼容时，握手及桌面业务接口返回 HTTP 426；WebSocket 在升级连接前返回相同的 JSON 响应：
+
+```json
+{
+  "error": {
+    "code": "CLIENT_UPDATE_REQUIRED",
+    "message": "A desktop client update is required."
+  },
+  "minimumVersion": "0.1.0",
+  "hostApi": 2,
+  "serverVersion": "2026.11.0"
+}
+```
+
+错误对象还包含标准 `id`、`kind` 字段。客户端收到该响应后进入包体更新流程；普通前端热更新无法替代宿主升级。业务认证与版本校验独立执行，版本声明不授予账号权限。网页、PWA 及第三方应用继续使用各自入口，无需发送桌面版本字段。
+
+两端持续维持实时连接，断线后自动重连、恢复订阅并补取数据，无需整页刷新。素材目录中的公开资源变更触发 `clientResourcesUpdated`，客户端通过 `client-resources` 查询资源版本，原位更新资源缓存。
+
 ## 后台配置
 
 ### Cap 人机验证

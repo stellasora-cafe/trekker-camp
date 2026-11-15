@@ -91,6 +91,7 @@ import { misskeyApi } from '@/utility/misskey-api.js';
 import { instance, fetchInstance } from '@/instance.js';
 import { i18n } from '@/i18n.js';
 import { login } from '@/accounts.js';
+import { getWebDeviceHeaders } from '@/utility/get-user-environment.js';
 
 const props = withDefaults(defineProps<{
 	autoSet?: boolean;
@@ -233,6 +234,8 @@ async function onSubmit(): Promise<void> {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
+			'X-Camp-Client': 'web-v1',
+			...getWebDeviceHeaders(),
 		},
 		body: JSON.stringify(signupPayload),
 	}).catch(() => {

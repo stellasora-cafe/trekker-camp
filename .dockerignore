@@ -35,3 +35,11 @@ apps/misskey/packages/backend/test/compose.yml
 **/node_modules
 **/built
 **/src-js
+
+# Local desktop binaries and browser profiles never enter a server build.
+apps/desktop/artifacts
+apps/desktop/build
+apps/desktop/internal/webfrontend/assets/frontend.zip
+apps/desktop/internal/distribution/assets
+release
+apps/desktop/.release-resources

@@ -4,9 +4,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<MkSuspense v-slot="{ result }" :p="_fetch_">
-	<XRoot :post="result"/>
-</MkSuspense>
+<PageWithHeader>
+	<MkSuspense v-slot="{ result }" :p="_fetch_">
+		<XRoot :post="result"/>
+	</MkSuspense>
+</PageWithHeader>
 </template>
 
 <script lang="ts" setup>

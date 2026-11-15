@@ -63,6 +63,18 @@ test('first pull initializes an empty local asset directory, then fast-forwards'
 	assert.equal(readFileSync(join(root, 'apps/misskey/packages/frontend/assets/camp/image.svg'), 'utf8'), '<svg>updated</svg>');
 });
 
+test('transferred repository recognizes existing HTTPS and SSH origins', async t => {
+	const { root, remote } = fixture(t);
+	const { directory } = await pullPrivateAssets(root, { source: '', repository: remote });
+	writeFileSync(join(directory, 'public', 'local.svg'), '<svg/>');
+	for (const origin of ['https://github.com/HePudding/trekker-camp-assets.git', 'git@github.com:HePudding/trekker-camp-assets.git']) {
+		git(directory, 'remote', 'set-url', 'origin', origin);
+		await assert.rejects(pullPrivateAssets(root, { source: '' }), /local changes/);
+	}
+	git(directory, 'remote', 'set-url', 'origin', 'https://github.com/unrelated/trekker-camp-assets.git');
+	await assert.rejects(pullPrivateAssets(root, { source: '' }), /another repository/);
+});
+
 test('pull preserves uncommitted assets and topic branches', async t => {
 	const { root, remote } = fixture(t);
 	const { directory } = await pullPrivateAssets(root, { source: '', repository: remote });

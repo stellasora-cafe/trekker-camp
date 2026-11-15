@@ -3,13 +3,13 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { watch, version as vueVersion } from 'vue';
+import { createApp, markRaw, watch, version as vueVersion } from 'vue';
 import { compareVersions } from 'compare-versions';
-import { version, lang, isSafeMode } from '@@/js/config.js';
+import { version, lang, isSafeMode, host } from '@@/js/config.js';
 import defaultLightTheme from '@@/themes/l-trekker.json5';
 import defaultDarkTheme from '@@/themes/d-trekker.json5';
 import { storeBootloaderErrors } from '@@/js/store-boot-errors';
-import type { App } from 'vue';
+import type { Component } from 'vue';
 import widgets from '@/widgets/index.js';
 import directives from '@/directives/index.js';
 import components from '@/components/index.js';
@@ -28,12 +28,22 @@ import { analytics, initAnalytics } from '@/analytics.js';
 import { miLocalStorage } from '@/local-storage.js';
 import { fetchCustomEmojis } from '@/custom-emojis.js';
 import { prefer } from '@/preferences.js';
-import { $i } from '@/i.js';
+import { $i, discardedSessionAccountId, upgradedClientSession } from '@/i.js';
 import { launchPlugins } from '@/plugin.js';
 import { initTelemetry } from '@/telemetry.js';
+import { isDesktopClient, offline, startOfflineRecovery } from '@/utility/offline.js';
+import MkOfflineGate from '@/components/MkOfflineGate.vue';
 
-export async function common(createVue: () => Promise<App<Element>>) {
+export async function common(createRoot: () => Promise<Component>) {
 	console.info(`Misskey v${version}`);
+	startOfflineRecovery();
+	watch(offline, (value, previous) => {
+		if (!value && previous) {
+			void fetchInstance(true);
+			void refreshCurrentAccount();
+			void fetchCustomEmojis(true).catch(() => {});
+		}
+	});
 
 	if (_DEV_) {
 		console.warn('Development mode!!!');
@@ -117,6 +127,13 @@ export async function common(createVue: () => Promise<App<Element>>) {
 
 	await store.ready;
 	await deckStore.ready;
+	if (discardedSessionAccountId != null) {
+		const tokens = { ...store.s.accountTokens };
+		delete tokens[host + '/' + discardedSessionAccountId];
+		store.set('accountTokens', tokens);
+	} else if (upgradedClientSession && $i) {
+		store.set('accountTokens', { ...store.s.accountTokens, [host + '/' + $i.id]: $i.token });
+	}
 
 	const fetchInstanceMetaPromise = fetchInstance();
 
@@ -238,13 +255,17 @@ export async function common(createVue: () => Promise<App<Element>>) {
 			console.log('account cache found. refreshing...');
 		}
 
-		await refreshCurrentAccount();
+		if (isDesktopClient()) void refreshCurrentAccount();
+		else await refreshCurrentAccount();
 	}
 	//#endregion
 
-	try {
-		await fetchCustomEmojis(true);
-	} catch (err) { /* empty */ }
+	if (isDesktopClient()) void fetchCustomEmojis(true).catch(() => {});
+	else {
+		try {
+			await fetchCustomEmojis(true);
+		} catch (err) { /* empty */ }
+	}
 
 	// analytics
 	fetchInstanceMetaPromise.then(async () => {
@@ -259,7 +280,8 @@ export async function common(createVue: () => Promise<App<Element>>) {
 		});
 	});
 
-	const app = await createVue();
+	const rootComponent = await createRoot();
+	const app = isDesktopClient() ? createApp(MkOfflineGate, { component: markRaw(rootComponent) }) : createApp(rootComponent);
 
 	if (_DEV_) {
 		app.config.performance = true;
@@ -289,11 +311,9 @@ export async function common(createVue: () => Promise<App<Element>>) {
 
 	await initTelemetry(instance, app);
 
-	try {
-		await launchPlugins();
-	} catch (error) {
-		console.error('Failed to launch plugins:', error);
-	}
+	const plugins = () => launchPlugins().catch(error => console.error('Failed to launch plugins:', error));
+	if (isDesktopClient()) void plugins();
+	else await plugins();
 
 	app.mount(rootEl);
 

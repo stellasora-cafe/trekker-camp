@@ -163,13 +163,15 @@ export function getConfig(): UserConfig {
 
 		resolve: {
 			extensions,
-			alias: {
-				'@/': __dirname + '/src/',
-				'@@/': __dirname + '/../frontend-shared/',
-				'/client-assets/': __dirname + '/assets/',
-				'/static-assets/': __dirname + '/../backend/assets/',
-				'/fluent-emoji/': '@misskey-dev/emoji-assets/fluent-emoji/',
-			},
+			alias: [
+				{ find: '@/', replacement: __dirname + '/src/' },
+				{ find: '@@/', replacement: __dirname + '/../frontend-shared/' },
+				// Separately managed camp assets, including MiSans, keep their
+				// runtime URLs in development and in the published CSS.
+				{ find: /^\/client-assets\/(?!camp\/)/, replacement: __dirname + '/assets/' },
+				{ find: '/static-assets/', replacement: __dirname + '/../backend/assets/' },
+				{ find: '/fluent-emoji/', replacement: '@misskey-dev/emoji-assets/fluent-emoji/' },
+			],
 		},
 
 		css: {

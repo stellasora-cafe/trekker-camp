@@ -6,7 +6,42 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+// MiSans uses OS/2 weights 330/380/520/630. These ranges match the native
+// DirectWrite nearest-face selection for the shared UI weights.
+@font-face {
+	font-family: 'MiSans';
+	src: url('/client-assets/camp/fonts/misans-v1/MiSans-Regular.woff2') format('woff2');
+	font-weight: 100 354;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'MiSans';
+	src: url('/client-assets/camp/fonts/misans-v1/MiSans-Medium.woff2') format('woff2');
+	font-weight: 355 449;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'MiSans';
+	src: url('/client-assets/camp/fonts/misans-v1/MiSans-Semibold.woff2') format('woff2');
+	font-weight: 450 574;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'MiSans';
+	src: url('/client-assets/camp/fonts/misans-v1/MiSans-Bold.woff2') format('woff2');
+	font-weight: 575 900;
+	font-style: normal;
+	font-display: swap;
+}
+
 :root {
+	--MI-font: 'MiSans', 'Hiragino Maru Gothic Pro', "BIZ UDGothic", Roboto, HelveticaNeue, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 	--MI-radius: 12px;
 	--MI-marginFull: 16px;
 	--MI-marginHalf: 10px;
@@ -22,10 +57,35 @@
 	}
 }
 
+:root[data-camp-window-chrome="true"] {
+	--camp-window-controls-height: 50px;
+	--camp-window-controls-width: 132px;
+	--camp-window-header-height: 50px;
+	--camp-window-header-bg: var(--MI_THEME-pageHeaderBg);
+	--camp-window-header-fg: var(--MI_THEME-pageHeaderFg);
+
+	&[data-camp-window-fullscreen="true"] {
+		--camp-window-controls-height: 0px;
+		--camp-window-controls-width: 0px;
+	}
+}
+
+html[data-camp-window-chrome="true"] ._campWindowHeader {
+	--height: 50px;
+	box-sizing: border-box;
+	height: 50px;
+	min-height: 50px;
+	flex-shrink: 0;
+	background: var(--camp-window-header-bg);
+	color: var(--camp-window-header-fg);
+	box-shadow: inset 0 -1px var(--MI_THEME-divider);
+	user-select: none;
+}
+
 html {
 	overflow: auto;
 	overflow-wrap: break-word;
-	font-family: 'Hiragino Maru Gothic Pro', "BIZ UDGothic", Roboto, HelveticaNeue, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+	font-family: var(--MI-font);
 	font-size: 14px;
 	line-height: 1.35;
 	text-size-adjust: 100%;
@@ -126,6 +186,7 @@ a {
 }
 
 textarea, input {
+	font-family: inherit;
 	tap-highlight-color: transparent;
 	-webkit-tap-highlight-color: transparent;
 	user-select: text;

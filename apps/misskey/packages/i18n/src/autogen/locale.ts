@@ -1834,6 +1834,76 @@ export interface Locale extends ILocale {
      */
     "aboutMisskey": string;
     /**
+     * 关于营地
+     */
+    "aboutCamp": string;
+    "_aboutCamp": {
+        /**
+         * 旅人营地
+         */
+        "name": string;
+        /**
+         * 星塔旅人非官方社区。爱与希望，就在路上。
+         */
+        "description": string;
+        /**
+         * 基于 Misskey
+         */
+        "basedOn": string;
+        /**
+         * 维护团队
+         */
+        "team": string;
+        /**
+         * 星塔咖啡厅 · StellaSora Café
+         */
+        "organization": string;
+        /**
+         * 旅人营地由星塔咖啡厅（stellasora-cafe）开发与维护。
+         */
+        "maintainedBy": string;
+        /**
+         * 我们是民间《星塔旅人》游戏工具组织，希望帮助魔魔王们获得更丰富的游戏体验。
+         */
+        "teamDescription": string;
+        /**
+         * 开源与许可
+         */
+        "licensing": string;
+        /**
+         * 桌面宿主 · MIT
+         */
+        "desktopLicense": string;
+        /**
+         * 由星塔咖啡厅独立开发的桌面宿主代码采用 MIT 许可证，负责窗口、系统集成与应用更新。
+         */
+        "desktopLicenseDescription": string;
+        /**
+         * 社区前端 · AGPL-3.0
+         */
+        "frontendLicense": string;
+        /**
+         * 营地网页、PWA 和客户端内的 Misskey 前端继续采用 AGPL-3.0；对应版本的源码与构建脚本保持公开。客户端发行包中的不同组成部分各自遵循适用许可。
+         */
+        "frontendLicenseDescription": string;
+        /**
+         * 未来星塔工具箱可包含独立开发、单独许可的闭源模块；具体许可将在模块内注明。
+         */
+        "toolboxLicenseDescription": string;
+        /**
+         * 字体、图片、音频与品牌素材按各自授权使用，代码的开源许可不覆盖这些素材。
+         */
+        "assetLicenseDescription": string;
+        /**
+         * 许可范围与第三方声明
+         */
+        "licensingDetails": string;
+    };
+    /**
+     * 本应用使用 MiSans 字体
+     */
+    "misansFontCredit": string;
+    /**
      * 管理员
      */
     "administrator": string;
@@ -4354,7 +4424,7 @@ export interface Locale extends ILocale {
      */
     "copyErrorInfo": string;
     /**
-     * 在本服务器上注册
+     * 注册
      */
     "joinThisServer": string;
     /**
@@ -11560,7 +11630,7 @@ export interface Locale extends ILocale {
          */
         "introduction": string;
         /**
-         * 可以随时通过屏幕右侧的 + 来添加列
+         * 可以随时通过工具栏中的 + 来添加列
          */
         "introduction2": string;
         /**
@@ -13256,6 +13326,10 @@ export interface Locale extends ILocale {
          */
         "makeSureDisabledCustomCss_description": string;
         /**
+         * 自定义 CSS 可能会影响性能。尝试关闭自定义 CSS，查看耗电情况是否改善。
+         */
+        "makeSureDisabledCustomCss_desktopDescription": string;
+        /**
          * 请关闭扩展
          */
         "makeSureDisabledAddons": string;
@@ -14110,6 +14184,84 @@ export interface Locale extends ILocale {
          */
         "accessKeySecret": string;
     };
+    "_clientSessions": {
+        /**
+         * 登录设备
+         */
+        "title": string;
+        /**
+         * 管理网页登录与旅人营地客户端的登录设备。第三方应用授权请前往已授权应用。
+         */
+        "description": string;
+        /**
+         * 当前设备
+         */
+        "current": string;
+        /**
+         * 网页浏览器
+         */
+        "web": string;
+        /**
+         * 旅人营地客户端
+         */
+        "desktop": string;
+        /**
+         * 退出此设备
+         */
+        "revoke": string;
+        /**
+         * 确定退出「{name}」吗？此设备将需要重新登录。
+         */
+        "revokeConfirm": ParameterizedString<"name">;
+        /**
+         * 登录时间
+         */
+        "createdAt": string;
+        /**
+         * 最近活动
+         */
+        "lastActiveAt": string;
+        /**
+         * 系统
+         */
+        "platform": string;
+        /**
+         * 登录地址
+         */
+        "address": string;
+        /**
+         * 授权客户端登录
+         */
+        "browserAuthorize": string;
+        /**
+         * 此操作将让旅人营地客户端以所选账号登录。你可以在登录设备中随时退出该设备。
+         */
+        "browserAuthorizeDescription": string;
+        /**
+         * 先登录营地账号，再确认让客户端使用该账号。
+         */
+        "authorizationSignIn": string;
+        /**
+         * 授权完成，请回到旅人营地客户端继续使用。
+         */
+        "authorizationComplete": string;
+        /**
+         * 已拒绝此次登录。你可以关闭此页，或回到客户端重新发起。
+         */
+        "authorizationDenied": string;
+        /**
+         * 暂时无法完成授权。请重试，或回到客户端重新发起登录。
+         */
+        "authorizationFailed": string;
+        /**
+         * 此登录请求已过期或已处理，请返回客户端重新发起。
+         */
+        "requestExpired": string;
+        /**
+         * 有效期至
+         */
+        "expiresAt": string;
+    };
     "_registration": {
         /**
          * 使用手机验证码
@@ -14191,5 +14343,169 @@ export interface Locale extends ILocale {
          * 这是一封旅人营地测试邮件。收到此邮件表示邮件发送配置正常。
          */
         "testEmailBody": string;
+    };
+    "_desktop": {
+        /**
+         * 检查更新
+         */
+        "checkUpdates": string;
+        /**
+         * 连接已断开，正在尝试重连。
+         */
+        "connectionLost": string;
+        /**
+         * 新版本已就绪，将在下次启动时生效。
+         */
+        "updateReady": string;
+        /**
+         * 刷新并更新
+         */
+        "refreshUpdate": string;
+        /**
+         * 刷新会关闭当前编辑界面，尚未保存的内容可能丢失。仍要刷新吗？
+         */
+        "finishEditing": string;
+        /**
+         * 旅人营地
+         */
+        "appName": string;
+        /**
+         * 最小化
+         */
+        "minimize": string;
+        /**
+         * 最大化
+         */
+        "maximize": string;
+        /**
+         * 还原窗口
+         */
+        "restore": string;
+        /**
+         * 关闭窗口
+         */
+        "closeWindow": string;
+        /**
+         * 剪切
+         */
+        "cut": string;
+        /**
+         * 撤销
+         */
+        "undo": string;
+        /**
+         * 重做
+         */
+        "redo": string;
+        /**
+         * 全选
+         */
+        "selectAll": string;
+        /**
+         * 打开链接
+         */
+        "openLink": string;
+        /**
+         * 复制图片
+         */
+        "copyImage": string;
+        /**
+         * 保存图片
+         */
+        "saveImage": string;
+        /**
+         * 打开图片
+         */
+        "openImage": string;
+        /**
+         * 复制图片地址
+         */
+        "copyImageLink": string;
+        /**
+         * 播放
+         */
+        "play": string;
+        /**
+         * 暂停
+         */
+        "pause": string;
+        /**
+         * 静音
+         */
+        "mute": string;
+        /**
+         * 取消静音
+         */
+        "unmute": string;
+        /**
+         * 操作未完成，请重试。
+         */
+        "contextActionFailed": string;
+        /**
+         * 不登录使用星塔工具箱（待开放）
+         */
+        "toolboxComingSoon": string;
+        /**
+         * 从浏览器登录
+         */
+        "browserLogin": string;
+        /**
+         * 请在浏览器中确认登录，完成后会自动返回营地。
+         */
+        "browserLoginWaiting": string;
+        /**
+         * 重新打开浏览器
+         */
+        "browserLoginReopen": string;
+        /**
+         * 已拒绝此次登录，可重新发起授权。
+         */
+        "browserLoginDenied": string;
+        /**
+         * 登录请求已超时，请重新打开浏览器授权。
+         */
+        "browserLoginExpired": string;
+        /**
+         * 暂时无法完成浏览器登录，请检查网络后重试。
+         */
+        "browserLoginFailed": string;
+    };
+    "_offline": {
+        /**
+         * 营地休整时间
+         */
+        "eyebrow": string;
+        /**
+         * 魔王大人，稍作休息吧。
+         */
+        "title": string;
+        /**
+         * 营地正在维护，或暂时无法连接。
+         */
+        "description": string;
+        /**
+         * 连接恢复后，将自动返回营地。
+         */
+        "reconnectHint": string;
+        /**
+         * 离线使用星塔工具箱
+         */
+        "toolbox": string;
+        /**
+         * 待开放
+         */
+        "toolboxComingSoon": string;
+        /**
+         * 再看看营地
+         */
+        "retry": string;
+        /**
+         * 两位旅人向大家鞠躬致歉
+         */
+        "imageAlt": string;
+        /**
+         * 正在重新连接…
+         */
+        "waiting": string;
     };
 }
