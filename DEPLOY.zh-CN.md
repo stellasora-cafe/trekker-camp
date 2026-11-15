@@ -25,6 +25,8 @@ bash /tmp/camp-deploy.sh install --release "$release" --url https://camp.example
 
 CLI 只接受 GitHub 已发布的服务端 Release，验证归档白名单、标签、提交号及镜像摘要后再生成配置。未指定 `--release` 时选择最新稳定 `server-v*` Release，忽略桌面版本、草稿和预发行版。开发分支和未发布标签不会被部署。
 
+安装包来自 Actions 的 `Server release` 工作流，固定下载 Release 附件 `camp-server-<tag>.tar.gz`。这个包按白名单生成，只含 Compose、配置模板、CLI、备份脚本、代理配置和镜像版本清单；CLI 解包前再次检查完整文件清单。GitHub 自动生成的源码 ZIP/TAR、整仓 clone、桌面工程、测试、`AGENTS.md`、本地配置和私有素材都不作为服务器安装包。Web 与 Caddy 使用同次 Actions 构建、固定 digest 的 GHCR 镜像。
+
 ### 现有服务器迁移到组织仓库与 Release 部署
 
 本次服务端版本保留桌面浏览器授权、设备会话、版本兼容检查与前端资源接口。桌面程序可以在服务端发布后单独进行真实连接测试和发布，无需同步发布安装器。

@@ -46,6 +46,7 @@ curl() {
       *) shift ;;
     esac
   done
+  printf '%s\\n' "$url" >> "$TEST_ROOT/requested-urls"
   if [[ $url == https://api.github.com/* ]]; then cp "$METADATA" "$output";
   else cp "$ARCHIVE" "$output"; fi
 }
@@ -55,10 +56,25 @@ curl() {
         return result
 
     def test_bundle_is_allowlist_only_without_source_or_private_resources(self):
-        with tarfile.open(self.bundle) as archive:
+        checkout = self.root / 'checkout'
+        for name in builder.FILES:
+            path = checkout / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes((ROOT / name).read_bytes())
+        for name in ('AGENTS.md', '.git/config', '.config/default.yml',
+                     'apps/desktop/client.exe', 'apps/update-service/wrangler.jsonc',
+                     'apps/misskey/packages/backend/test/fixture.ts',
+                     'private-assets/public/font.woff2', 'node_modules/package/index.js'):
+            path = checkout / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('not a deployment file')
+        bundle = builder.build(checkout, self.root / 'output', TAG, 'c' * 40, WEB, CADDY)
+        with tarfile.open(bundle) as archive:
             names = archive.getnames()
             self.assertEqual(set(names), set(builder.FILES) | {'RELEASE.json', 'compose.release.yml'})
-            self.assertFalse(any('AGENTS' in name or 'private-assets' in name or name.endswith(('.png', '.woff2')) for name in names))
+            self.assertFalse(any(name.startswith(('apps/', 'node_modules/', '.git/', 'private-assets/'))
+                                 or 'AGENTS' in name or name == '.config/default.yml'
+                                 or name.endswith(('.png', '.woff2')) for name in names))
             release = json.load(archive.extractfile('RELEASE.json'))
             self.assertEqual(release['web'], WEB)
 
@@ -70,11 +86,15 @@ curl() {
         self.assertEqual((destination / '.config/default.yml').read_text(), 'existing configuration')
         self.assertTrue((destination / 'scripts/deploy.sh').is_file())
         self.assertFalse((destination / '.git').exists())
+        self.assertEqual((self.root / 'requested-urls').read_text().splitlines(), [
+            'https://api.github.com/repos/stellasora-cafe/trekker-camp/releases?per_page=100',
+            f'https://github.com/stellasora-cafe/trekker-camp/releases/download/{TAG}/camp-server-{TAG}.tar.gz',
+        ])
 
     def test_invalid_members_rejected_before_any_write(self):
         with tarfile.open(self.bundle, 'r:gz') as archive:
             files = {m.name: archive.extractfile(m).read() for m in archive.getmembers()}
-        for bad in ('../escape', 'AGENTS.md', 'private-assets/public/font.woff2'):
+        for bad in ('../escape', 'AGENTS.md', 'apps/desktop/client.exe', 'apps/update-service/wrangler.jsonc', 'private-assets/public/font.woff2'):
             with self.subTest(bad=bad):
                 with tarfile.open(self.bundle, 'w:gz') as archive:
                     for name, data in {**files, bad: b'no'}.items():

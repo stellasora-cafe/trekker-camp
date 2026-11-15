@@ -68,4 +68,4 @@ jobs:
         shell: bash
         run: |
           gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "$GITHUB_REF_NAME" --generate-notes
-          gh release upload "$GITHUB_REF_NAME" release/*.tar.gz
+          gh release upload "$GITHUB_REF_NAME" "release/camp-server-$GITHUB_REF_NAME.tar.gz"
