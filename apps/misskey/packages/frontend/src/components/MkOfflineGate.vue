@@ -15,7 +15,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <div v-if="customChrome" v-show="!offline" id="camp-desktop-overlays" :class="$style.overlays" data-camp-desktop-content :inert="offline" :aria-hidden="offline || undefined">
 	<MkContextMenu v-if="contextMenu && !offline" :items="contextMenu.items" :ev="contextMenu.ev" @closed="closeContextMenu"/>
 </div>
-<dialog ref="maintenance" :class="$style.maintenance" :aria-label="i18n.ts._offline.title" @cancel.prevent @keydown.stop>
+<dialog ref="maintenance" data-camp-maintenance-view :class="$style.maintenance" :aria-label="i18n.ts._offline.title" @cancel.prevent @keydown.stop>
 	<MkDesktopTitlebar v-if="offline"/>
 	<div v-if="customChrome" class="_campWindowHeader" data-camp-window-drag></div>
 	<div ref="maintenanceContent" tabindex="-1" :class="$style.maintenanceContent">

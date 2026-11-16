@@ -20,6 +20,7 @@ import (
 var trayIcon []byte
 
 func (c *client) configureTrayLifecycle() {
+	mygo.App.OnSecondInstance(func([]string, string) { c.restoreFromTray() })
 	mygo.App.OnWindowAllClosed(func() {
 		if !c.inTray.Load() {
 			mygo.App.Quit()
@@ -28,6 +29,7 @@ func (c *client) configureTrayLifecycle() {
 	if runtime.GOOS != "windows" {
 		return
 	}
+	_ = c.ensureTray()
 	mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) { c.quitting = true })
 	mygo.App.OnQuitCanceled(func() { c.quitting = false })
 	mygo.App.OnQuit(func() {
@@ -159,18 +161,10 @@ func (c *client) performWindowClose(window *mygo.Window, action closeBehavior, s
 		mygo.App.Quit()
 		return
 	}
-	menu := mygo.NewMenu([]*mygo.MenuItem{
-		{Label: "打开旅人营地", Click: func(*mygo.MenuItem, *mygo.Window) { c.restoreFromTray() }},
-		mygo.Separator(),
-		{Label: "退出旅人营地", Click: func(*mygo.MenuItem, *mygo.Window) { mygo.App.Quit() }},
-	})
-	tray, err := mygo.NewTray(mygo.TrayOptions{ID: "camp", Icon: trayIcon, ToolTip: "旅人营地", Menu: menu})
-	if err != nil {
+	if err := c.ensureTray(); err != nil {
 		c.showCloseDialog(window, "暂时无法收起", "未能创建托盘图标，请重试。", nil)
 		return
 	}
-	c.tray = tray
-	tray.OnClick(c.restoreFromTray)
 	c.inTray.Store(true)
 	c.windowMu.Lock()
 	c.window, c.mainFrontend = nil, nil
@@ -196,6 +190,24 @@ func (c *client) performWindowClose(window *mygo.Window, action closeBehavior, s
 	}
 }
 
+func (c *client) ensureTray() error {
+	if c.tray != nil {
+		return nil
+	}
+	menu := mygo.NewMenu([]*mygo.MenuItem{
+		{Label: "打开旅人营地", Click: func(*mygo.MenuItem, *mygo.Window) { c.restoreFromTray() }},
+		mygo.Separator(),
+		{Label: "退出旅人营地", Click: func(*mygo.MenuItem, *mygo.Window) { mygo.App.Quit() }},
+	})
+	tray, err := mygo.NewTray(mygo.TrayOptions{ID: "camp", Icon: trayIcon, ToolTip: "旅人营地", Menu: menu})
+	if err != nil {
+		return err
+	}
+	c.tray = tray
+	tray.OnClick(c.restoreFromTray)
+	return nil
+}
+
 func (c *client) stopTray() {
 	if c.trayCancel != nil {
 		c.trayCancel()
@@ -209,10 +221,26 @@ func (c *client) stopTray() {
 
 func (c *client) restoreFromTray() {
 	mygo.RunOnMain(func() {
-		if c.quitting || !c.inTray.CompareAndSwap(true, false) {
+		if c.quitting {
 			return
 		}
-		c.stopTray()
+		if !c.inTray.CompareAndSwap(true, false) {
+			c.windowMu.Lock()
+			window := c.window
+			c.windowMu.Unlock()
+			if window != nil && !window.IsDestroyed() {
+				window.Show()
+				if window.IsMinimized() {
+					window.Restore()
+				}
+				window.Focus()
+			}
+			return
+		}
+		if c.trayCancel != nil {
+			c.trayCancel()
+			c.trayCancel = nil
+		}
 		if c.packageRequired.Load() {
 			// Recheck compatibility with a visible parent for an update prompt.
 			c.packageRequired.Store(false)

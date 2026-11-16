@@ -349,7 +349,14 @@ func newEngine(s source) (media.Engine, error) {
 			return nil, err
 		}
 	} else {
-		url := bstr(mediaFoundationSource(s.url))
+		// Media Foundation reads the percent-escapes of a file: URL as
+		// bytes of the system's code page, not UTF-8, so a file whose path
+		// is not ASCII goes by its path, which SetSource takes as well.
+		src := mediaFoundationSource(s.url)
+		if s.path != "" {
+			src = s.path
+		}
+		url := bstr(src)
 		hr := call(e.engine, engineSetSource, url)
 		procSysFreeString.Call(url)
 		if failed(hr) {

@@ -2,7 +2,7 @@
   "name": "TrekkerCamp",
   "slug": "trekker-camp",
   "identifier": "cafe.stellasora.camp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "icon": "../misskey/packages/frontend/assets/trekker-camp/branding/app-icon-512-v1.png",
   "out": "build",
   "buildCommand": "node scripts/prepare-release.mjs",

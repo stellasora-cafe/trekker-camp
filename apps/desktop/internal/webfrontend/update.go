@@ -213,6 +213,9 @@ func (u *Updates) get(ctx context.Context, path string, limit int64) ([]byte, er
 		return nil, err
 	}
 	defer response.Body.Close()
+	if response.Header.Get("X-Camp-Page") == "maintenance" {
+		return nil, ErrMaintenance
+	}
 	if response.StatusCode == http.StatusUpgradeRequired {
 		var required UpdateRequiredError
 		if err := json.NewDecoder(io.LimitReader(response.Body, 16384)).Decode(&required); err != nil {

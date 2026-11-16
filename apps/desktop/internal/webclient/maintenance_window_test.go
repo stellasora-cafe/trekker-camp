@@ -22,7 +22,8 @@ func TestMaintenancePreloadRemovesActionsWithoutFrontend(t *testing.T) {
 	}
 	frontend := filepath.Join(cwd, "../../../misskey/packages/frontend/package.json")
 	encodedFrontend, _ := json.Marshal(frontend)
-	encodedScript, _ := json.Marshal(maintenancePreload("https://camp.example/__camp-maintenance/v1.html#/", "windows"))
+	encodedScript, _ := json.Marshal(maintenancePreload("https://camp.example/__camp-maintenance/v1.html#/", "windows", true))
+	encodedMainScript, _ := json.Marshal(maintenancePreload("https://camp.example/__camp-maintenance/v1.html#/", "windows", false))
 	script := `import {createRequire} from 'node:module';import {pathToFileURL} from 'node:url';import assert from 'node:assert/strict';
 const require=createRequire(` + string(encodedFrontend) + `);const {Window}=await import(pathToFileURL(require.resolve('happy-dom')).href);
 const page=new Window({url:'https://camp.example/__camp-maintenance/v1.html#/'});
@@ -32,7 +33,16 @@ assert.equal(page.document.querySelector('.actions'),null);assert.equal(page.doc
 assert.equal(page.document.querySelector('h1').textContent,'维护中');assert.equal(page.document.querySelectorAll('#camp-maintenance-caption button').length,3);
 page.document.body.insertAdjacentHTML('beforeend','<div class="actions"><button>刷新</button></div>');
 await new Promise(resolve=>setTimeout(resolve,5));assert.equal(page.document.querySelector('.actions'),null);
-page.close();`
+page.close();
+const main=new Window({url:'https://camp.example/__camp-maintenance/v1.html#/'});
+main.document.body.innerHTML='<main><div class="actions"><button id="retry">existing retry</button><button data-camp-offline-toolbox disabled>existing toolbox</button></div></main>';
+const actions=main.document.querySelector('.actions');let clicks=0;main.document.getElementById('retry').addEventListener('click',()=>clicks++);
+main.eval(` + string(encodedMainScript) + `);
+assert.equal(main.document.querySelector('.actions'),actions);main.document.getElementById('retry').click();assert.equal(clicks,1);
+assert.equal(main.document.querySelector('[data-camp-offline-toolbox]').disabled,true);
+assert.equal(main.document.querySelectorAll('#camp-maintenance-caption button').length,3);
+assert.ok(!main.document.getElementById('camp-maintenance-style').textContent.includes('.actions'));
+main.close();`
 	command := exec.Command(node, "--input-type=module", "-e", script)
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("maintenance DOM: %v\n%s", err, output)

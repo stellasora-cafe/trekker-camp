@@ -301,7 +301,7 @@ func (p *Painter) paintInlineLayer(paint *inlineParagraphPaint, e *node, start, 
 	base := p.transform
 	mark := paint.next
 	for again := false; ; again = true {
-		cv, x0, y0, w, h = p.layer(e, from)
+		cv, x0, y0, w, h = p.layer(e, from, p.scale)
 		if cv == nil {
 			return false
 		}
@@ -313,7 +313,7 @@ func (p *Painter) paintInlineLayer(paint *inlineParagraphPaint, e *node, start, 
 			cp.transform = scene.Translation(-x0/p.scale, -y0/p.scale).Mul(inv)
 			cp.paintInlineBody(paint, e, start, end, relative)
 		})
-		actual := p.keepInk(e, cv, x0, y0)
+		actual := p.keepInk(e, cv, x0, y0, p.scale)
 		if again || e.effect != nil {
 			break
 		}
@@ -334,7 +334,7 @@ func (p *Painter) paintInlineLayer(paint *inlineParagraphPaint, e *node, start, 
 		p.inline, p.textGradient = savedInline, savedGradient
 		p.opacity = opacity
 	} else {
-		p.layerOp(cv, x0, y0, w, h, p.opacity*e.fade(), e.blur*p.scale)
+		p.layerOp(cv, x0, y0, w, h, p.opacity*e.fade(), e.blur*p.scale, 1, false)
 	}
 	p.transform = base
 	return true

@@ -93,37 +93,46 @@ func (s *System) breakLinesRegular(text []rune, style Style, spans []Span, width
 	return out
 }
 
-// padded reports whether a span pads its pieces of lines (Span.PaddingX).
+// padded reports whether a span pads its pieces of lines (Span.PaddingX,
+// Span.PaddingStart).
 func padded(spans []Span) bool {
 	for _, sp := range spans {
-		if sp.PaddingX > 0 || sp.Leading != 0 || sp.Trailing != 0 {
+		if sp.PaddingX > 0 || sp.PaddingStart > 0 || sp.Leading != 0 || sp.Trailing != 0 {
 			return true
 		}
 	}
 	return false
 }
 
-// padOf returns the padding of span k at each end of its pieces of lines,
-// 0 past the spans.
-func padOf(spans []Span, k int) float32 {
+// padEnd returns the padding of span k at the logical end of its pieces
+// of lines, 0 past the spans.
+func padEnd(spans []Span, k int) float32 {
 	if k < 0 || k >= len(spans) {
 		return 0
 	}
-	return max(spans[k].PaddingX, 0)
+	return max(spans[k].PaddingX, 0) + spans[k].Trailing
 }
 
-func leadingOf(spans []Span, k int) float32 {
+// padBegin returns the padding of span k at the logical start of its
+// pieces of lines, PaddingStart with PaddingX, 0 past the spans. Where only
+// the width counts, a piece takes padBegin and padEnd whatever its
+// direction.
+func padBegin(spans []Span, k int) float32 {
 	if k < 0 || k >= len(spans) {
 		return 0
 	}
-	return padOf(spans, k) + spans[k].Leading
+	return max(spans[k].PaddingX, 0) + max(spans[k].PaddingStart, 0) + spans[k].Leading
 }
 
-func trailingOf(spans []Span, k int) float32 {
-	if k < 0 || k >= len(spans) {
-		return 0
+// padSide returns the padding of span k at the visual left (left true) or
+// right of a piece of it whose glyphs run right to left when rtl: the
+// start, which has PaddingStart, is the left of a left-to-right piece and
+// the right of a right-to-left one.
+func padSide(spans []Span, k int, left, rtl bool) float32 {
+	if left != rtl {
+		return padBegin(spans, k)
 	}
-	return padOf(spans, k) + spans[k].Trailing
+	return padEnd(spans, k)
 }
 
 // paddedWidth returns the width of the glyphs of a shaped line of a
@@ -145,33 +154,34 @@ func paddedWidth(l shapedLine, text []rune, spans []Span) (w, pad float32) {
 				continue // the ellipsis, with the glyphs before it
 			}
 			if j := spanIndex(spans, g.Cluster); j != k {
-				pad += trailingOf(spans, k) + leadingOf(spans, j)
+				pad += padEnd(spans, k) + padBegin(spans, j)
 				k = j
 			}
 		}
 	}
-	return w, pad + trailingOf(spans, k)
+	return w, pad + padEnd(spans, k)
 }
 
 // padLine moves the glyphs of a line, in visual order, apart by the
 // padding of its spans' pieces, at both ends of each, as CSS pads each
 // line's fragment of an inline box with box-decoration-break: clone, and
-// widens the line by it. The line's runes start at rune offset of the
+// widens the line by it. A piece's PaddingStart goes on the side its
+// direction starts at. The line's runes start at rune offset of the
 // spans' text.
 func padLine(line *Line, spans []Span, offset int) {
-	dx, k := float32(0), -1
+	dx, k, rtl := float32(0), -1, false
 	for i := range line.Glyphs {
 		g := &line.Glyphs[i]
 		// The ellipsis goes with the glyphs before it.
 		if g.Runes > 0 {
 			if j := spanIndex(spans, g.Cluster-offset); j != k {
-				dx += trailingOf(spans, k) + leadingOf(spans, j)
-				k = j
+				dx += padSide(spans, k, false, rtl) + padSide(spans, j, true, g.RTL)
+				k, rtl = j, g.RTL
 			}
 		}
 		g.X += dx
 	}
-	dx += trailingOf(spans, k)
+	dx += padSide(spans, k, false, rtl)
 	line.Width += dx
 	line.padding = dx
 }
@@ -511,3 +521,6 @@ func stretches(r rune) bool {
 	}
 	return unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Bopomofo)
 }
+
+func leadingOf(spans []Span, k int) float32  { return padBegin(spans, k) }
+func trailingOf(spans []Span, k int) float32 { return padEnd(spans, k) }

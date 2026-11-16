@@ -62,6 +62,9 @@ func main() {
 		}
 		mygo.App.SetPath(mygo.PathUserData, absolute)
 	}
+	if !mygo.App.RequestSingleInstanceLock() {
+		return
+	}
 	mygo.App.WhenReady(func() {
 		if webclient.ShowRuntimeGuide() {
 			mygo.App.OnWindowAllClosed(mygo.App.Quit)

@@ -157,14 +157,14 @@ func shapeTextAligned(s string, font Font, shape TextShape, spans []Span) *TextL
 	params := text.Params{Text: s, Style: font.style(), Width: shape.Width, KeepSpaces: !shape.PreWrap, PreWrap: shape.PreWrap, Spans: encodeSpans(spans), RTL: shape.Direction == RightToLeft,
 		Justify: shape.Justify, Indent: shape.Indent, NoBreakWords: shape.NoBreakWords, BreakAll: shape.WordBreakAll, Balance: shape.Balance, Pretty: shape.Pretty}
 	if shape.TabSize > 0 {
-		linkTabs.Do(text.Shared().UseTabSize)
+		text.Shared().UseTabSize()
 		params.Style.TabSize = shape.TabSize
 	}
 	if shape.Justify {
 		text.Shared().UseJustify()
 	}
 	if shape.Pretty {
-		linkPretty.Do(text.Shared().UsePretty)
+		text.Shared().UsePretty()
 	}
 	switch {
 	case shape.Align == Center:

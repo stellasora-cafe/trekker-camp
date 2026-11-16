@@ -133,7 +133,6 @@ func (c *client) startConnected() {
 	c.frontendLoops.Do(func() {
 		go c.refreshAssets()
 		go c.frontendUpdateLoop()
-		go c.maintenanceLoop()
 		go c.packageUpdateLoop()
 	})
 }

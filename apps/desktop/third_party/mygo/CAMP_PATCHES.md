@@ -1,7 +1,7 @@
 # MyGo used by the desktop client
 
-This standalone module is based on `github.com/egoist/mygo` **v0.9.0**, upstream
-commit `4811a2869b5a66d2b7e21a9eb5993fcff544460b`. Its original **MIT** license is
+This standalone module is based on `github.com/egoist/mygo` **v0.9.2**, upstream
+commit `25ce62f4d357cd6d29da04300e3fbc352d79daa4`. Its original **MIT** license is
 preserved in `LICENSE`. Imports retain their upstream module path.
 
 The tree includes the runtime, UI, CLI, platform code, plugins, generators,
