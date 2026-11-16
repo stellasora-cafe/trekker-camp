@@ -33,10 +33,10 @@ test('syncs carousel arrows with the scroll position when returning to a cached 
 			clientWidth: { value: 200 },
 			scrollWidth: { value: 360 },
 		});
-		gallery.scrollBy = vi.fn(({ left }: ScrollToOptions) => {
-			gallery.scrollLeft += left ?? 0;
+		gallery.scrollBy = (options?: ScrollToOptions | number) => {
+			gallery.scrollLeft += typeof options === 'number' ? options : options?.left ?? 0;
 			gallery.dispatchEvent(new Event('scroll'));
-		});
+		};
 		await fireEvent.scroll(gallery);
 		await fireEvent.click(next);
 		expect(gallery.scrollLeft).toBe(160);
