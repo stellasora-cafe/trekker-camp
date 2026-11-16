@@ -42,3 +42,32 @@ func TestProbeTargetRejectsForeignOriginAndServerFailure(t *testing.T) {
 		t.Fatal("foreign target accepted")
 	}
 }
+
+func TestMaintenanceDocumentNegotiation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Accept") == "text/html" {
+			http.Redirect(w, r, "/__camp-maintenance/v1.html#/", http.StatusFound)
+			return
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+	if active, err := ProbeOrigin(context.Background(), server.URL); !active || err != nil {
+		t.Fatalf("document maintenance redirect was missed: active=%v err=%v", active, err)
+	}
+}
+
+func TestMaintenanceResponseMarker(t *testing.T) {
+	for _, status := range []int{http.StatusOK, http.StatusServiceUnavailable} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-Camp-Page", "maintenance")
+			w.WriteHeader(status)
+			_, _ = w.Write([]byte(`{"error":{"code":"CAMP_MAINTENANCE"}}`))
+		}))
+		active, err := ProbeTarget(context.Background(), server.URL, server.URL+UpdatePath)
+		server.Close()
+		if !active || err != nil {
+			t.Fatalf("maintenance HTTP %d was missed: active=%v err=%v", status, active, err)
+		}
+	}
+}

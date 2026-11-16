@@ -117,6 +117,7 @@ func Open(origin, directory string, safeMode *bool) error {
 	}
 	c.configureTrayLifecycle()
 	c.openBootstrap()
+	go c.maintenanceLoop()
 	return nil
 }
 
@@ -132,8 +133,13 @@ func (c *client) configurePage(window *mygo.Window, tool bool) {
 			return
 		}
 		if webfrontend.IsMaintenanceURL(c.origin, e.URL) {
-			e.PreventDefault()
 			c.maintenanceRetries.Store(window, c.maintenanceReturnURL(window))
+			if c.mainNeedsMaintenanceDocument(window) {
+				c.maintenanceState.Store(true)
+				window.Show()
+				return
+			}
+			e.PreventDefault()
 			c.windowMu.Lock()
 			ready := c.toolReady[window]
 			c.windowMu.Unlock()

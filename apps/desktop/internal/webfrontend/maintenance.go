@@ -48,6 +48,7 @@ func ProbeTarget(ctx context.Context, origin, target string) (bool, error) {
 		return false, err
 	}
 	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Accept", "text/html")
 	client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if IsMaintenanceURL(origin, req.URL.String()) {
 			return ErrMaintenance
@@ -68,6 +69,9 @@ func ProbeTarget(ctx context.Context, origin, target string) (bool, error) {
 		return false, err
 	}
 	defer response.Body.Close()
+	if response.Header.Get("X-Camp-Page") == "maintenance" {
+		return true, nil
+	}
 	if response.StatusCode >= 500 {
 		return false, fmt.Errorf("maintenance probe HTTP %d", response.StatusCode)
 	}

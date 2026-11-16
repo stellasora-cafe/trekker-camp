@@ -17,6 +17,7 @@ import (
 // frontendWindow tracks the source of the running document independently
 // from the downloadable cache. Its revisions are guarded by windowMu.
 type frontendWindow struct {
+	ready          atomic.Bool
 	online         atomic.Bool
 	onlineRevision string
 	pending        string

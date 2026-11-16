@@ -42,7 +42,7 @@ func (c *client) pageOptions(tool, offline bool, useServerFrontend func() bool) 
 		return pinned
 	}
 	settings := c.closeBehaviorEnabled(tool)
-	preload := c.credentials.preload() + c.preload + hostPreload(c.origin, c.safeMode) + windowChromePreload(c.origin, runtime.GOOS) + windowPreload(c.origin, tool, offline) + frontendUpdatePreload(c.origin)
+	preload := maintenancePreload(c.origin+"/__camp-maintenance/v1.html", runtime.GOOS, false) + c.credentials.preload() + c.preload + hostPreload(c.origin, c.safeMode) + windowChromePreload(c.origin, runtime.GOOS) + windowPreload(c.origin, tool, offline) + frontendUpdatePreload(c.origin)
 	if settings {
 		preload += c.closeBehaviorPreload()
 	}
@@ -328,6 +328,9 @@ func (c *client) handleWindowCommand(window *mygo.Window, raw string) bool {
 	go func() {
 		c.windowMu.Lock()
 		main := c.window == window
+		if main && c.mainFrontend != nil {
+			c.mainFrontend.ready.Store(true)
+		}
 		_, tool := c.tools[window]
 		ready := c.toolReady[window]
 		toolLogin := tool && c.guest && !guest && !offline

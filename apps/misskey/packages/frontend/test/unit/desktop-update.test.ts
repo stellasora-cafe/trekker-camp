@@ -75,3 +75,16 @@ test('empty page allows restart, login dialog and uninitialized page keep it ope
 	document.body.innerHTML = '';
 	expect(await prepareDesktopPackageRestart()).toBe(false);
 });
+
+test('maintenance does not block closing while drafts are saved and other dialogs stay protected', async () => {
+	const save = vi.fn(() => true);
+	dispose.push(registerDesktopRestartEditor({ root: document.getElementById('composer')!, key: () => 'draft', save }));
+	document.body.insertAdjacentHTML('beforeend', '<dialog open data-camp-maintenance-view>maintenance</dialog>');
+	expect(await prepareDesktopPackageRestart()).toBe(true);
+	expect(save).toHaveBeenCalledOnce();
+	document.body.insertAdjacentHTML('beforeend', '<dialog open>unsaved dialog</dialog>');
+	expect(await prepareDesktopPackageRestart()).toBe(false);
+	document.body.lastElementChild!.remove();
+	save.mockReturnValue(false);
+	expect(await prepareDesktopPackageRestart()).toBe(false);
+});

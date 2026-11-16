@@ -16,7 +16,7 @@ import (
 )
 
 func TestCheckCompatibilityOnlyRequestsManifest(t *testing.T) {
-	for _, mode := range []string{"compatible", "upgrade", "host-api", "maintenance", "malformed"} {
+	for _, mode := range []string{"compatible", "upgrade", "host-api", "maintenance", "maintenance-json", "malformed"} {
 		t.Run(mode, func(t *testing.T) {
 			var requests atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -36,6 +36,11 @@ func TestCheckCompatibilityOnlyRequestsManifest(t *testing.T) {
 					return
 				case "maintenance":
 					http.Redirect(w, r, "/__camp-maintenance/v1.html#/", http.StatusFound)
+					return
+				case "maintenance-json":
+					w.Header().Set("X-Camp-Page", "maintenance")
+					w.WriteHeader(http.StatusServiceUnavailable)
+					_, _ = w.Write([]byte(`{"error":{"code":"CAMP_MAINTENANCE"}}`))
 					return
 				case "malformed":
 					_, _ = w.Write([]byte(`not a manifest`))
@@ -67,7 +72,7 @@ func TestCheckCompatibilityOnlyRequestsManifest(t *testing.T) {
 				if mode == "upgrade" && (required.MinimumVersion != "0.3.0" || required.ServerVersion != "next") {
 					t.Fatalf("lost version requirements: %+v", required)
 				}
-			case "maintenance":
+			case "maintenance", "maintenance-json":
 				if !errors.Is(err, ErrMaintenance) {
 					t.Fatalf("missing maintenance gate: %v", err)
 				}

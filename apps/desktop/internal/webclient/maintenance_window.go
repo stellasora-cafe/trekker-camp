@@ -63,10 +63,21 @@ func (c *client) openMaintenanceWindow(raw string) {
 		if c.inTray.Load() || c.ctx.Err() != nil || !c.maintenanceState.Load() {
 			return
 		}
+		guest, windows := c.maintenanceTargets()
+		if !guest {
+			if c.maintenanceWindow != nil && !c.maintenanceWindow.IsDestroyed() {
+				c.maintenanceWindow.Destroy()
+			}
+			c.maintenanceWindow = nil
+			for _, window := range windows {
+				go c.sendMaintenance(window)
+			}
+			return
+		}
 		if c.maintenanceWindow != nil && !c.maintenanceWindow.IsDestroyed() {
 			return
 		}
-		options := mygo.WindowOptions{Title: "营地维护中", Width: 760, Height: 820, MinWidth: 440, MinHeight: 500, UseContentSize: true, BackgroundColor: "#eef2f8", Page: mygo.PageOptions{Untrusted: true, PreloadScript: maintenancePreload(raw, runtime.GOOS)}}
+		options := mygo.WindowOptions{Title: "营地维护中", Width: 760, Height: 820, MinWidth: 440, MinHeight: 500, UseContentSize: true, BackgroundColor: "#eef2f8", Page: mygo.PageOptions{Untrusted: true, PreloadScript: maintenancePreload(raw, runtime.GOOS, true)}}
 		applyWindowChrome(&options, runtime.GOOS)
 		window := mygo.NewWindow(options)
 		c.maintenanceWindow = window
@@ -99,7 +110,7 @@ func (c *client) openMaintenanceWindow(raw string) {
 	})
 }
 
-func maintenancePreload(raw, platform string) string {
+func maintenancePreload(raw, platform string, hideActions bool) string {
 	origin := strings.Split(raw, "/__camp-maintenance/")[0]
 	encodedOrigin, _ := json.Marshal(origin)
 	chrome := ""
@@ -107,12 +118,17 @@ func maintenancePreload(raw, platform string) string {
 		chrome = `<div id="camp-maintenance-caption"><div data-drag></div><button data-action="minimize" aria-label="最小化">` + string(captionAsset("minimize")) + `</button><button data-action="maximize" aria-label="最大化"><span class="maximize">` + string(captionAsset("maximize")) + `</span><span class="restore">` + string(captionAsset("restore")) + `</span></button><button data-action="close" aria-label="关闭">` + string(captionAsset("close")) + `</button></div>`
 	}
 	encodedChrome, _ := json.Marshal(chrome)
-	return windowChromePreload(origin, platform) + `;(()=>{if(window!==top||location.origin!==` + string(encodedOrigin) + `)return;
-const css='.actions,[data-camp-offline-toolbox]{display:none!important}#camp-maintenance-caption{position:fixed;inset:0 0 auto;height:50px;display:flex;z-index:2147483646;background:#eef2f8;color:#4b5082;user-select:none}#camp-maintenance-caption [data-drag]{flex:1}#camp-maintenance-caption button{width:42px;height:50px;border:0;padding:0;border-radius:0;display:grid;place-items:center;color:inherit;background:transparent;transition:background-color 100ms,color 100ms}#camp-maintenance-caption button:hover{background:#dce5ee}#camp-maintenance-caption button[data-action=close]:hover{background:#e81123;color:white}#camp-maintenance-caption svg{width:10px;height:10px;pointer-events:none}#camp-maintenance-caption span{display:flex}#camp-maintenance-caption .restore{display:none}[data-camp-window-maximized=true] #camp-maintenance-caption .maximize{display:none}[data-camp-window-maximized=true] #camp-maintenance-caption .restore{display:flex}[data-camp-window-active=false] #camp-maintenance-caption button:not(:hover){color:#9297af}[data-camp-window-chrome=true] body{padding-top:70px!important}@media(prefers-reduced-motion:reduce){#camp-maintenance-caption button{transition:none}}';
+	actionsCSS, actionsScript := "", ""
+	if hideActions {
+		actionsCSS = ".actions,[data-camp-offline-toolbox]{display:none!important}"
+		actionsScript = "document.querySelectorAll('.actions,[data-camp-offline-toolbox]').forEach(node=>node.remove());"
+	}
+	return windowChromePreload(origin, platform) + `;(()=>{if(window!==top||location.origin!==` + string(encodedOrigin) + `||location.pathname!=="/__camp-maintenance/v1.html")return;
+const css='` + actionsCSS + `#camp-maintenance-caption{position:fixed;inset:0 0 auto;height:50px;display:flex;z-index:2147483646;background:#eef2f8;color:#4b5082;user-select:none}#camp-maintenance-caption [data-drag]{flex:1}#camp-maintenance-caption button{width:42px;height:50px;border:0;padding:0;border-radius:0;display:grid;place-items:center;color:inherit;background:transparent;transition:background-color 100ms,color 100ms}#camp-maintenance-caption button:hover{background:#dce5ee}#camp-maintenance-caption button[data-action=close]:hover{background:#e81123;color:white}#camp-maintenance-caption svg{width:10px;height:10px;pointer-events:none}#camp-maintenance-caption span{display:flex}#camp-maintenance-caption .restore{display:none}[data-camp-window-maximized=true] #camp-maintenance-caption .maximize{display:none}[data-camp-window-maximized=true] #camp-maintenance-caption .restore{display:flex}[data-camp-window-active=false] #camp-maintenance-caption button:not(:hover){color:#9297af}[data-camp-window-chrome=true] body{padding-top:70px!important}@media(prefers-reduced-motion:reduce){#camp-maintenance-caption button{transition:none}}';
 const install=()=>{if(!document.documentElement)return;
 if(!document.getElementById('camp-maintenance-style')){const style=document.createElement('style');style.id='camp-maintenance-style';style.textContent=css;document.documentElement.append(style)}
 if(!document.body)return;
-document.querySelectorAll('.actions,[data-camp-offline-toolbox]').forEach(node=>node.remove());
+` + actionsScript + `
 const html=` + string(encodedChrome) + `;if(html&&!document.getElementById('camp-maintenance-caption')){const holder=document.createElement('div');holder.innerHTML=html;const caption=holder.firstElementChild;document.body.prepend(caption);const command=action=>location.href='camp-desktop://window-control?action='+action;
 caption.querySelectorAll('button').forEach(button=>button.addEventListener('click',()=>command(button.dataset.action)));const drag=caption.querySelector('[data-drag]');drag.addEventListener('mousedown',event=>{if(event.button===0&&event.detail===1)command('drag')});drag.addEventListener('dblclick',()=>command('maximize'));}
 };new MutationObserver(install).observe(document,{childList:true,subtree:true});install();})();`

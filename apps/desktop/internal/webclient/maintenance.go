@@ -38,25 +38,27 @@ func (c *client) checkMaintenance() {
 
 func (c *client) setMaintenance(active bool) {
 	c.maintenanceState.Store(active)
-	c.windowMu.Lock()
-	guest := c.guest
-	windows := make([]*mygo.Window, 0, len(c.tools)+1)
-	if c.window != nil && !guest {
-		windows = append(windows, c.window)
-	}
-	for w := range c.tools {
-		windows = append(windows, w)
-	}
-	c.windowMu.Unlock()
-	if active && (guest || c.frontend == nil) {
-		c.openMaintenanceWindow(c.origin + "/__camp-maintenance/v1.html#/")
-	}
+	_, windows := c.maintenanceTargets()
 	if !active {
 		c.closeMaintenanceWindow()
 	}
 	for _, w := range windows {
 		c.sendMaintenance(w)
 	}
+}
+
+// Maintenance follows the current window, independently of the frontend cache.
+func (c *client) maintenanceTargets() (bool, []*mygo.Window) {
+	c.windowMu.Lock()
+	defer c.windowMu.Unlock()
+	windows := make([]*mygo.Window, 0, len(c.tools)+1)
+	if c.window != nil && !c.guest && c.mainFrontend != nil {
+		windows = append(windows, c.window)
+	}
+	for w := range c.tools {
+		windows = append(windows, w)
+	}
+	return c.guest, windows
 }
 
 func (c *client) sendMaintenance(w *mygo.Window) {
@@ -85,4 +87,12 @@ func (c *client) probeMaintenance(ctx context.Context) (bool, error) {
 		}
 	}
 	return false, failure
+}
+
+// A main window without a mounted frontend must load the server's maintenance
+// document; sending a frontend event to its empty page cannot make it visible.
+func (c *client) mainNeedsMaintenanceDocument(window *mygo.Window) bool {
+	c.windowMu.Lock()
+	defer c.windowMu.Unlock()
+	return c.window == window && !c.guest && c.mainFrontend != nil && !c.mainFrontend.ready.Load()
 }

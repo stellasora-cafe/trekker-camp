@@ -138,7 +138,10 @@ func packageVersionAtLeast(version, minimum string) bool {
 // to flush all registered drafts first, and fail closed if it cannot do so.
 const packageRestartSafeScript = `(()=>{
 if (!document.getElementById('misskey_app')?.childElementCount) return false;
-if (document.querySelector('dialog[open],[role="dialog"],[data-camp-pending-edit="true"]')) return false;
+const maintenance = e => e.matches('[data-camp-maintenance-view]') ||
+ document.documentElement.dataset.campMaintenance === 'true' && e.matches('dialog') && e.querySelector(':scope > div[tabindex="-1"] > section[aria-live="polite"]');
+if ([...document.querySelectorAll('dialog[open],[role="dialog"]')].some(e=>!maintenance(e))) return false;
+if (document.querySelector('[data-camp-pending-edit="true"]')) return false;
 if ([...document.querySelectorAll('input[type="file"]')].some(e=>e.files?.length)) return false;
 return ![...document.querySelectorAll('textarea,[contenteditable="true"]')].some(e=>e.isContentEditable?e.textContent?.trim():e.value?.trim());
 })()`
@@ -172,6 +175,10 @@ func (c *client) prepareWindowExit(saveDrafts, closing bool) bool {
 			continue
 		}
 		page := window.Page()
+		// The standalone maintenance document has no frontend editors.
+		if closing && window == main && webfrontend.IsMaintenanceURL(c.origin, page.URL()) {
+			continue
+		}
 		if PackagePageRestartSafe(c.ctx, page, saveDrafts) {
 			continue
 		}
@@ -179,6 +186,11 @@ func (c *client) prepareWindowExit(saveDrafts, closing bool) bool {
 		// defaultChecked comparison sees their stored values as edited inputs.
 		// On close, still check the page for text editors, uploads and dialogs.
 		if closing && window == main {
+			// Cached frontends may still count their maintenance dialog as an
+			// editor. Keep all unsaved inputs protected in this host fallback.
+			if c.maintenanceState.Load() && sameOrigin(c.origin, page.URL()) && maintenancePageCloseSafe(c.ctx, page) {
+				continue
+			}
 			if raw := page.URL(); sameOrigin(c.origin, raw) {
 				target, err := url.Parse(raw)
 				if err == nil && target.Path == "/settings/preferences" && preferencesPageCloseSafe(c.ctx, page) {
@@ -189,6 +201,17 @@ func (c *client) prepareWindowExit(saveDrafts, closing bool) bool {
 		return false
 	}
 	return true
+}
+
+const maintenanceCloseSafeScript = `(` + packageRestartSafeScript + `) &&
+ ![...document.querySelectorAll('input')].some(e=>e.files?.length||e.value!==e.defaultValue||e.checked!==e.defaultChecked) &&
+ ![...document.querySelectorAll('select')].some(e=>[...e.options].some(o=>o.selected!==o.defaultSelected))`
+
+func maintenancePageCloseSafe(ctx context.Context, page *mygo.Page) bool {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	result, err := page.EvalContext(ctx, maintenanceCloseSafeScript)
+	return err == nil && result == true
 }
 
 func preferencesPageCloseSafe(ctx context.Context, page *mygo.Page) bool {

@@ -22,7 +22,7 @@ export async function prepareDesktopPackageRestart(): Promise<boolean> {
 	if (window.document.documentElement.dataset.campDesktop !== 'true' || !window.document.getElementById('misskey_app')?.childElementCount) return false;
 	const active = [...editors].filter(editor => editor.root.isConnected);
 	const owned = (element: Element) => active.some(editor => editor.root.contains(element));
-	if ([...window.document.querySelectorAll('dialog[open], [role="dialog"]')].some(dialog => !active.some(editor => dialog.contains(editor.root)))) return false;
+	if ([...window.document.querySelectorAll('dialog[open]:not([data-camp-maintenance-view]), [role="dialog"]:not([data-camp-maintenance-view])')].some(dialog => !active.some(editor => dialog.contains(editor.root)))) return false;
 	for (const element of window.document.querySelectorAll('input, textarea, select, [contenteditable="true"], [data-camp-pending-edit="true"]')) {
 		if (owned(element)) continue;
 		if (element.hasAttribute('data-camp-pending-edit')) return false;
