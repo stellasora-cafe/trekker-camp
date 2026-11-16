@@ -61,7 +61,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { computed, markRaw, nextTick, onMounted, onUnmounted, ref, useTemplateRef } from 'vue';
+import { computed, markRaw, nextTick, onActivated, onMounted, onUnmounted, ref, useTemplateRef } from 'vue';
 import * as Misskey from 'misskey-js';
 import type { Content } from '@/components/MkLightbox.item.vue';
 import type { MediaComponentExposes } from '@/types/media-component.js';
@@ -160,8 +160,11 @@ function scrollCarousel(dir: 1 | -1) {
 onMounted(() => {
 	calcAspectRatio();
 	nextTick(updateArrows);
+});
 
-	if (gallery.value == null) return; // TSを黙らすため
+// A cached page can be reattached with its scroll position reset and no scroll event.
+onActivated(() => {
+	nextTick(updateArrows);
 });
 
 onUnmounted(() => {
