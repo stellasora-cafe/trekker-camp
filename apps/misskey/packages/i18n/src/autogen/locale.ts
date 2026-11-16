@@ -14386,6 +14386,26 @@ export interface Locale extends ILocale {
          */
         "closeWindow": string;
         /**
+         * 关闭按钮行为
+         */
+        "closeBehavior": string;
+        /**
+         * 关闭主窗口时，收进托盘可以继续接收通知和心链消息。此设置仅适用于本机客户端。
+         */
+        "closeBehaviorDescription": string;
+        /**
+         * 下次关闭时询问
+         */
+        "closeBehaviorAsk": string;
+        /**
+         * 收进托盘
+         */
+        "closeBehaviorTray": string;
+        /**
+         * 退出应用
+         */
+        "closeBehaviorQuit": string;
+        /**
          * 剪切
          */
         "cut": string;

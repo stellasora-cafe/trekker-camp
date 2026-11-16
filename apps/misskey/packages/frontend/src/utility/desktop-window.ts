@@ -5,6 +5,17 @@
 
 import '@/utility/desktop-update.js';
 
+export type DesktopCloseBehavior = 'ask' | 'tray' | 'quit';
+
+declare global {
+	interface Window {
+		__campCloseBehavior?: {
+			get: () => Promise<DesktopCloseBehavior>;
+			set: (value: DesktopCloseBehavior) => Promise<DesktopCloseBehavior>;
+		};
+	}
+}
+
 export function desktopWindowMode(): 'browser' | 'main' | 'tool' {
 	if (window.document.documentElement.dataset.campDesktop !== 'true') return 'browser';
 	return window.document.documentElement.dataset.campDesktopWindow === 'tool' ? 'tool' : 'main';
