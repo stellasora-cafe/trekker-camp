@@ -86,7 +86,7 @@ jobs:
 
           对应版本的完整源码及构建脚本：https://github.com/stellasora-cafe/trekker-camp/tree/$env:GITHUB_REF_NAME
 
-          原创桌面宿主采用 Apache-2.0；首次联网下载的 Misskey 前端保留 AGPL-3.0-only。安装器包含关于营地美术、MiSans 字体及许可，不携带前端、维护插图或其他私有素材。第三方许可见安装目录 resources/licenses。
+          原创桌面客户端代码采用 Apache-2.0；首次联网下载的 Misskey 前端保留 AGPL-3.0-only。安装器包含关于营地美术、MiSans 字体及许可，不携带前端、维护插图或其他私有素材。第三方许可见安装目录 resources/licenses。
           "@ | Set-Content -LiteralPath $notes -Encoding utf8
           gh release create $env:GITHUB_REF_NAME --verify-tag --draft --title "旅人营地客户端 $env:GITHUB_REF_NAME" --notes-file $notes @assets
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

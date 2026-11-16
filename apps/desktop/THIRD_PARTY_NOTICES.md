@@ -4,7 +4,7 @@
 
 | 组成部分 | 授权与记录 |
 | --- | --- |
-| 原创桌面宿主 | [Apache-2.0](LICENSE)，适用范围见 [LICENSING.md](LICENSING.md) |
+| 原创桌面客户端代码 | [Apache-2.0](LICENSE)，适用范围见 [LICENSING.md](LICENSING.md) |
 | Misskey 网页前端 | AGPL-3.0-only，发行包内 `LICENSE-AGPL-3.0.txt`，源码内根目录 `LICENSE` |
 | MyGo | MIT，源码内 `third_party/mygo/LICENSE`，保留上游与补丁作者版权 |
 | Go 及 Go 模块依赖 | 源码内 `go.mod` / `go.sum` 固定版本；各模块保留其随附许可证 |

@@ -2,9 +2,9 @@
 
 旅人营地由[星塔咖啡厅（stellasora-cafe）](https://github.com/stellasora-cafe)开发与维护，是《星塔旅人》的非官方社区。
 
-## 原创桌面宿主：Apache-2.0
+## 原创桌面客户端代码：Apache-2.0
 
-本目录的 [Apache 2.0 许可证](LICENSE) 适用于标记 `SPDX-License-Identifier: Apache-2.0` 的原创桌面宿主代码：正式入口 `main.go`，以及 `campweb`、`webclient`、`webassets`、`webfrontend`、`webmedia` 中相应源文件。它们负责系统窗口、原生欢迎界面、设备协议、资源交付与更新。原创更新服务也采用 [Apache-2.0](../update-service/LICENSE)。
+本目录的 [Apache 2.0 许可证](LICENSE) 适用于标记 `SPDX-License-Identifier: Apache-2.0` 的原创桌面客户端代码：正式入口 `main.go`，以及 `campweb`、`webclient`、`webassets`、`webfrontend`、`webmedia` 中相应源文件。它们负责系统窗口、原生欢迎界面、设备协议、资源交付与更新。原创更新服务也采用 [Apache-2.0](../update-service/LICENSE)。
 
 正式入口使用 MyGo 自带按钮。MyGo 保留其 MIT 许可证与版权声明。源码中的具体 SPDX 声明与第三方许可优先于目录级说明。
 

@@ -16,19 +16,10 @@ import (
 	"github.com/egoist/mygo"
 )
 
-const campOrganizationURL = "https://github.com/stellasora-cafe"
-const campRepositoryURL = campOrganizationURL + "/trekker-camp"
 const aboutOrigin = "https://about.camp-desktop.invalid"
 
 //go:embed about/*
 var aboutFiles embed.FS
-
-func desktopSourceURL(version string) string {
-	if version == "" {
-		return campRepositoryURL
-	}
-	return campRepositoryURL + "/tree/desktop-v" + version
-}
 
 func aboutHandler(resources, version string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -55,9 +46,9 @@ func aboutHandler(resources, version string) http.Handler {
 						label = "开发版"
 					}
 					err = t.Execute(&b, struct {
-						Version, Source                    string
+						Version                            string
 						Minimize, Maximize, Restore, Close template.HTML
-					}{label, desktopSourceURL(version), captionAssetHTML("minimize"), captionAssetHTML("maximize"), captionAssetHTML("restore"), captionAssetHTML("close")})
+					}{label, captionAssetHTML("minimize"), captionAssetHTML("maximize"), captionAssetHTML("restore"), captionAssetHTML("close")})
 					data = b.Bytes()
 				}
 			}

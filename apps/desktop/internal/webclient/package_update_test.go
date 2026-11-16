@@ -3,7 +3,11 @@
 
 package webclient
 
-import "testing"
+import (
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
 
 func TestFailedRequiredUpdateCanReturnToEditorWithoutClearingGate(t *testing.T) {
 	c := &client{}
@@ -68,11 +72,18 @@ func TestGuestAboutOpensNativeWithoutWebsite(t *testing.T) {
 	}
 }
 
-func TestDesktopAboutSourceMatchesRelease(t *testing.T) {
-	if got := desktopSourceURL("1.2.3"); got != campRepositoryURL+"/tree/desktop-v1.2.3" {
-		t.Fatal(got)
-	}
-	if got := desktopSourceURL(""); got != campRepositoryURL {
-		t.Fatal(got)
+func TestDesktopAboutLinks(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	aboutHandler(t.TempDir(), "1.2.3").ServeHTTP(recorder, httptest.NewRequest("GET", aboutOrigin+"/", nil))
+	page := recorder.Body.String()
+	for _, expected := range []string{
+		`href="https://github.com/stellasora-cafe/trekker-camp"`,
+		`href="camp-desktop://about-misskey"`,
+		`<details>`,
+		"客户端版本 1.2.3",
+	} {
+		if recorder.Code != 200 || !strings.Contains(page, expected) {
+			t.Fatalf("about page missing %q (HTTP %d)", expected, recorder.Code)
+		}
 	}
 }
