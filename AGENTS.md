@@ -33,6 +33,7 @@
    - 开发和部署约定见 [ASSETS.md](ASSETS.md)。网页素材放在 `private-assets/public/`，原稿与授权记录放在 `public/` 外；两个目录及素材链接均不提交到公开仓库。
    - 团队素材库是 `stellasora-cafe/trekker-camp-assets`（Private，`master`）。首次准备团队开发环境用 `pnpm assets:pull`，以后按需快进同步；它会保留未提交素材和开发分支。无素材库权限时可用 `pnpm assets:link` 创建空目录。`pnpm dev` 离线建立或复用链接，通过 `/client-assets/camp/` 加载。多个 worktree 可通过 `CAMP_ASSETS_DIR` 共用已有的 `public` 目录。
    - 保持素材运行时加载，不将其 import、内嵌或复制进 JS/CSS 包、公开资源目录及镜像。程序代码、样式和构建脚本保持公开；没有私有素材时仍可构建、运行并使用默认资源或回退。
+   - 桌面安装器只携带宿主、内置关于页、关于页图像、许可白名单中的 MiSans 字体和法律声明。原始素材与前端热更新包分开管理。原创宿主采用 Apache-2.0，远端 Misskey 前端保留 AGPL-3.0-only，MyGo 保留 MIT，独立小工具按各自许可发布。详见 [桌面客户端许可](apps/desktop/LICENSING.md)。
    - Docker 使用 `compose.assets.yml` 只读挂载素材。不要将整个素材仓库（含原稿、授权记录或 `.git`）暴露为静态目录。
    - 不强制添加忽略的素材或链接，不创建指向私有素材库的 Git 子模块。修改素材机制、忽略规则或部署挂载时运行 `pnpm assets:test`；交付流程自动执行 `assets:check`。
    - 素材与代码分别提交。素材库的 `master` 更新在配置服务器后会自动同步 `public/`，未经授权不推送素材库 `master`。素材库的 Agent 规则与授权记录分别位于其 `AGENTS.md` 和 `RIGHTS.md`；不将 SSH 凭据加入任何仓库。

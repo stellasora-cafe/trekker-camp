@@ -1843,15 +1843,11 @@ export interface Locale extends ILocale {
          */
         "name": string;
         /**
-         * 星塔旅人非官方社区。爱与希望，就在路上。
+         * 《星塔旅人》的非官方社区。爱与希望，就在路上。
          */
         "description": string;
         /**
-         * 基于 Misskey
-         */
-        "basedOn": string;
-        /**
-         * 维护团队
+         * 开发与维护
          */
         "team": string;
         /**
@@ -1859,45 +1855,9 @@ export interface Locale extends ILocale {
          */
         "organization": string;
         /**
-         * 旅人营地由星塔咖啡厅（stellasora-cafe）开发与维护。
-         */
-        "maintainedBy": string;
-        /**
-         * 我们是民间《星塔旅人》游戏工具组织，希望帮助魔魔王们获得更丰富的游戏体验。
-         */
-        "teamDescription": string;
-        /**
-         * 开源与许可
+         * 开源许可
          */
         "licensing": string;
-        /**
-         * 桌面宿主 · MIT
-         */
-        "desktopLicense": string;
-        /**
-         * 由星塔咖啡厅独立开发的桌面宿主代码采用 MIT 许可证，负责窗口、系统集成与应用更新。
-         */
-        "desktopLicenseDescription": string;
-        /**
-         * 社区前端 · AGPL-3.0
-         */
-        "frontendLicense": string;
-        /**
-         * 营地网页、PWA 和客户端内的 Misskey 前端继续采用 AGPL-3.0；对应版本的源码与构建脚本保持公开。客户端发行包中的不同组成部分各自遵循适用许可。
-         */
-        "frontendLicenseDescription": string;
-        /**
-         * 未来星塔工具箱可包含独立开发、单独许可的闭源模块；具体许可将在模块内注明。
-         */
-        "toolboxLicenseDescription": string;
-        /**
-         * 字体、图片、音频与品牌素材按各自授权使用，代码的开源许可不覆盖这些素材。
-         */
-        "assetLicenseDescription": string;
-        /**
-         * 许可范围与第三方声明
-         */
-        "licensingDetails": string;
     };
     /**
      * 本应用使用 MiSans 字体
@@ -14385,6 +14345,26 @@ export interface Locale extends ILocale {
          * 关闭窗口
          */
         "closeWindow": string;
+        /**
+         * 关闭按钮行为
+         */
+        "closeBehavior": string;
+        /**
+         * 关闭主窗口时，收进托盘可以继续接收通知和心链消息。此设置仅适用于本机客户端。
+         */
+        "closeBehaviorDescription": string;
+        /**
+         * 下次关闭时询问
+         */
+        "closeBehaviorAsk": string;
+        /**
+         * 收进托盘
+         */
+        "closeBehaviorTray": string;
+        /**
+         * 退出应用
+         */
+        "closeBehaviorQuit": string;
         /**
          * 剪切
          */

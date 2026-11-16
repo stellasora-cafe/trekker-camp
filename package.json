@@ -26,6 +26,10 @@
 	],
 	"private": true,
 	"scripts": {
+		"desktop:dev": "go -C apps/desktop tool mygo dev",
+		"desktop:build": "go -C apps/desktop tool mygo build",
+		"desktop:frontend": "node scripts/build-desktop-frontend.mjs",
+		"desktop:test": "go -C apps/desktop test ./...",
 		"build-pre": "pnpm --dir apps/misskey run build-pre",
 		"build-assets": "pnpm --dir apps/misskey run build-assets",
 		"build": "pnpm --dir apps/misskey run build",
@@ -68,6 +72,7 @@
 		"tar": "7.5.22"
 	},
 	"devDependencies": {
+		"@aws-sdk/client-s3": "3.1161.0",
 		"@eslint/js": "9.39.5",
 		"@misskey-dev/eslint-plugin": "2.1.0",
 		"@types/node": "26.6.6",

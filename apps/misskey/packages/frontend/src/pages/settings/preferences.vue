@@ -44,6 +44,18 @@ SPDX-License-Identifier: AGPL-3.0-only
 							</MkRadios>
 						</SearchMarker>
 
+						<SearchMarker v-if="desktopCloseBehavior !== null" :keywords="['close', 'window', 'tray', 'quit']">
+							<MkSelect
+								:modelValue="desktopCloseBehavior"
+								:items="desktopCloseBehaviorOptions"
+								:disabled="savingDesktopCloseBehavior"
+								@update:modelValue="saveDesktopCloseBehavior"
+							>
+								<template #label><SearchLabel>{{ i18n.ts._desktop.closeBehavior }}</SearchLabel></template>
+								<template #caption>{{ i18n.ts._desktop.closeBehaviorDescription }}</template>
+							</MkSelect>
+						</SearchMarker>
+
 						<div class="_gaps_s">
 							<SearchMarker :keywords="['titlebar', 'show']">
 								<MkPreferenceContainer k="showTitlebar">
@@ -833,7 +845,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { langs } from '@@/js/config.js';
 import * as Misskey from 'misskey-js';
 import MkSwitch from '@/components/MkSwitch.vue';
@@ -862,8 +874,39 @@ import { ensureSignin } from '@/i.js';
 import { genId } from '@/utility/id.js';
 import { suggestReload } from '@/utility/reload-suggest.js';
 import { isDesktopClient } from '@/utility/offline.js';
+import type { DesktopCloseBehavior } from '@/utility/desktop-window.js';
 
 const $i = ensureSignin();
+
+const desktopCloseBridge = window.__campCloseBehavior;
+const desktopCloseBehavior = ref<DesktopCloseBehavior | null>(null);
+const savingDesktopCloseBehavior = ref(false);
+const desktopCloseBehaviorOptions = [
+	{ value: 'ask', label: i18n.ts._desktop.closeBehaviorAsk },
+	{ value: 'tray', label: i18n.ts._desktop.closeBehaviorTray },
+	{ value: 'quit', label: i18n.ts._desktop.closeBehaviorQuit },
+] satisfies { value: DesktopCloseBehavior; label: string }[];
+
+onMounted(async () => {
+	if (desktopCloseBridge == null) return;
+	try {
+		desktopCloseBehavior.value = await desktopCloseBridge.get();
+	} catch {
+		// The desktop setting is available only when the host bridge responds.
+	}
+});
+
+async function saveDesktopCloseBehavior(value: DesktopCloseBehavior) {
+	if (desktopCloseBridge == null || savingDesktopCloseBehavior.value) return;
+	savingDesktopCloseBehavior.value = true;
+	try {
+		desktopCloseBehavior.value = await desktopCloseBridge.set(value);
+	} catch {
+		void os.alert({ type: 'error', text: i18n.ts._desktop.contextActionFailed });
+	} finally {
+		savingDesktopCloseBehavior.value = false;
+	}
+}
 
 const lang = ref(miLocalStorage.getItem('lang'));
 const dataSaver = ref(prefer.s.dataSaver);
