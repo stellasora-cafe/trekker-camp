@@ -87,11 +87,11 @@ func (c *client) checkAllUpdates() {
 }
 
 func (c *client) requirePackageUpdate(minimum string) {
-	if c.inTray.Load() {
-		return
-	}
-	c.packageRequired.Store(true)
 	mygo.RunOnMain(func() {
+		if c.inTray.Load() {
+			return
+		}
+		c.packageRequired.Store(true)
 		p := c.openPackagePrompt(true, minimum)
 		if p == nil {
 			return
@@ -236,6 +236,9 @@ func PackagePageRestartSafe(ctx context.Context, page *mygo.Page, required bool)
 }
 
 func (c *client) openPackagePrompt(required bool, minimum string) *packageUpdatePrompt {
+	if c.inTray.Load() {
+		return nil
+	}
 	required = required || c.packageRequired.Load()
 	if existing := c.packagePrompt; existing != nil && !existing.window.IsDestroyed() {
 		if required {

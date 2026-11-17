@@ -194,6 +194,62 @@ if (window.XMLHttpRequest) {
 const Socket = window.WebSocket;
 const socketOrigin = new URL(origin);
 socketOrigin.protocol = socketOrigin.protocol === 'https:' ? 'wss:' : 'ws:';
+
+const recentNotices = new Set();
+const notificationBodies = new Map([
+	['reply', '回复了你的帖子'],
+	['mention', '在帖子中提到了你'],
+	['reaction', '回应了你的帖子'],
+	['renote', '转发了你的帖子'],
+	['quote', '转发了你的帖子'],
+	['follow', '关注了你'],
+	['receiveFollowRequest', '向你发送了关注请求'],
+]);
+
+function relayTrayNotice(event, token) {
+	if (!event.isTrusted || document.documentElement?.dataset.campDesktopWindow !== 'main' ||
+		window.Notification?.permission === 'denied' || typeof event.data !== 'string' ||
+		(!event.data.includes('"notification"') && !event.data.includes('"newChatMessage"'))) return;
+
+	let frame, account, preferences;
+	try {
+		frame = JSON.parse(event.data);
+		account = JSON.parse(localStorage.getItem('account'));
+	} catch { return; }
+	const type = frame?.body?.type;
+	const data = frame?.body?.body;
+	if (frame?.type !== 'channel' || (type !== 'notification' && type !== 'newChatMessage') ||
+		typeof data?.id !== 'string' || !data.id || !account?.id || account.token !== token) return;
+
+	const chat = type === 'newChatMessage';
+	if (chat && data.fromUserId === account.id) return;
+	const id = (chat ? 'chat:' : 'notification:') + data.id;
+	if (recentNotices.has(id)) return;
+	if (recentNotices.size >= 128) recentNotices.delete(recentNotices.values().next().value);
+	recentNotices.add(id);
+
+	try {
+		preferences = JSON.parse(localStorage.getItem('preferences'))?.preferences;
+	} catch { /* Use default notification sounds. */ }
+	const pref = key => preferences?.[key]?.find?.(row => row?.[0]?.account == null && row?.[0]?.server == null && row?.[0]?.device == null)?.[1];
+	const sound = pref(chat ? 'sound.on.chatMessage' : 'sound.on.notification');
+	const silent = pref('sound.notUseSound') === true || pref('sound.useSoundOnlyWhenActive') === true ||
+		pref('sound.masterVolume') === 0 || sound?.volume === 0 || (sound != null && sound.type == null);
+	const person = chat ? data.fromUser : data.user;
+	const name = typeof person?.name === 'string' ? person.name.trim() : '';
+	const title = name || (typeof person?.username === 'string' && person.username ? '@' + person.username : '旅人营地');
+	const body = chat
+		? (data.toRoomId && typeof data.toRoom?.name === 'string' && data.toRoom.name
+			? '在「' + data.toRoom.name.slice(0, 100) + '」发来一条心链消息'
+			: '发来一条心链消息')
+		: notificationBodies.get(data.type) ?? '你有一条新通知';
+	void fetchOriginal(origin + '/__camp-desktop/tray-notice', {
+		method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Camp-Tray-Notice': '1' },
+		body: JSON.stringify({ id: id.slice(0, 128), title: title.slice(0, 128), body, silent }),
+		credentials: 'omit', cache: 'no-store', redirect: 'error',
+	}).catch(() => {});
+}
+
 window.WebSocket = class extends Socket {
 	constructor(raw, protocols) {
 		const target = new URL(raw, location.href);
@@ -213,6 +269,12 @@ window.WebSocket = class extends Socket {
 			else target.searchParams.delete('i');
 		}
 		super(target.href, protocols);
-		if (target.origin === socketOrigin.origin && target.pathname === '/client-streaming') this.addEventListener('error', checkCompatibility);
+		if (target.origin === socketOrigin.origin && target.pathname === '/client-streaming') {
+			this.addEventListener('error', checkCompatibility);
+			const token = target.searchParams.get('i');
+			if (seed.platform === 'windows' && token?.startsWith('cs_')) {
+				this.addEventListener('message', event => relayTrayNotice(event, token));
+			}
+		}
 	}
 };
