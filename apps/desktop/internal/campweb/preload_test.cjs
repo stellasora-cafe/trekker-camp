@@ -278,4 +278,50 @@ async function run() {
 	process.stdout.write('campweb browser transport passed\n');
 }
 
-run().catch(error => { console.error(error); process.exitCode = 1; });
+async function testTrayNotifications() {
+	const page = realm();
+	const w = page.context;
+	w.document.documentElement.dataset.campDesktopWindow = 'main';
+	w.localStorage.setItem('account', JSON.stringify({ id: 'alpha', token: 'cs_alpha' }));
+	w.localStorage.setItem('preferences', JSON.stringify({ preferences: { 'sound.on.chatMessage': [[{}, { volume: 0 }]] } }));
+	const socket = new w.WebSocket('/streaming');
+	const receive = (connection, type, body, isTrusted = true) => {
+		const event = new Event('message');
+		Object.defineProperties(event, {
+			data: { value: JSON.stringify({ type: 'channel', body: { id: 'existing-main', type, body } }) },
+			isTrusted: { value: isTrusted },
+		});
+		connection.dispatchEvent(event);
+	};
+
+	let receivedByPage = 0;
+	socket.addEventListener('message', () => { receivedByPage++; });
+	const reply = { id: 'reply-1', type: 'reply', user: { name: '旅人' } };
+	receive(socket, 'notification', reply);
+	assert.equal(receivedByPage, 1);
+	assert.equal(page.last().url, base + '/__camp-desktop/tray-notice');
+	assert.equal(page.last().method, 'POST');
+	assert.equal(page.last().headers.get('Authorization'), null);
+	assert.deepEqual(await page.last().json(), { id: 'notification:reply-1', title: '旅人', body: '回复了你的帖子', silent: false });
+
+	const chat = { id: 'chat-1', fromUserId: 'beta', fromUser: { username: 'beta' }, toRoomId: 'room', toRoom: { name: '营地' }, text: 'private text' };
+	const reconnected = new w.WebSocket('/streaming');
+	receive(reconnected, 'notification', reply);
+	receive(reconnected, 'newChatMessage', chat);
+	assert.deepEqual(await page.last().json(), { id: 'chat:chat-1', title: '@beta', body: '在「营地」发来一条心链消息', silent: true });
+
+	receive(socket, 'newChatMessage', { ...chat, id: 'self', fromUserId: 'alpha' });
+	receive(socket, 'notification', { ...reply, id: 'synthetic' }, false);
+	receive(new w.WebSocket('wss://outside.invalid/client-streaming?i=cs_alpha'), 'notification', { ...reply, id: 'external' });
+	w.Notification = { permission: 'denied' };
+	receive(socket, 'notification', { ...reply, id: 'denied' });
+	w.Notification.permission = 'granted';
+	w.document.documentElement.dataset.campDesktopWindow = 'tool';
+	receive(socket, 'notification', { ...reply, id: 'tool' });
+	w.document.documentElement.dataset.campDesktopWindow = 'main';
+	w.localStorage.setItem('account', JSON.stringify({ id: 'beta', token: 'cs_beta' }));
+	receive(socket, 'notification', { ...reply, id: 'old-account' });
+	assert.equal(page.requests.length, 2);
+}
+
+(process.argv[2] === 'tray' ? testTrayNotifications() : run()).catch(error => { console.error(error); process.exitCode = 1; });

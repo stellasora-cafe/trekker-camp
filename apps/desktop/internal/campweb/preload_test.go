@@ -23,11 +23,20 @@ func TestPreloadOriginValidation(t *testing.T) {
 }
 
 func TestPreloadBrowserTransport(t *testing.T) {
+	testPreload(t)
+}
+
+func TestPreloadTrayNotifications(t *testing.T) {
+	testPreload(t, "tray")
+}
+
+func testPreload(t *testing.T, args ...string) {
+	t.Helper()
 	script, err := Preload("http://localhost:3000/", "windows")
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("node", "preload_test.cjs")
+	cmd := exec.Command("node", append([]string{"preload_test.cjs"}, args...)...)
 	cmd.Stdin = strings.NewReader(script)
 	output, err := cmd.CombinedOutput()
 	if err != nil {

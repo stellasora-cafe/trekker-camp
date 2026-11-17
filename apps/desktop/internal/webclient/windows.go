@@ -42,6 +42,7 @@ func (c *client) pageOptions(tool, offline bool, useServerFrontend func() bool) 
 		return pinned
 	}
 	settings := c.closeBehaviorEnabled(tool)
+	trayNotices := !tool && runtime.GOOS == "windows"
 	preload := maintenancePreload(c.origin+"/__camp-maintenance/v1.html", runtime.GOOS, false) + c.credentials.preload() + c.preload + hostPreload(c.origin, c.safeMode) + windowChromePreload(c.origin, runtime.GOOS) + windowPreload(c.origin, tool, offline) + frontendUpdatePreload(c.origin)
 	if settings {
 		preload += c.closeBehaviorPreload()
@@ -58,10 +59,17 @@ func (c *client) pageOptions(tool, offline bool, useServerFrontend func() bool) 
 			if err != nil {
 				return false
 			}
+			if trayNotices && u.Path == trayNoticePath {
+				return true
+			}
 			b := frontendForPath(u.Path)
 			return (settings && u.Path == closeBehaviorPath) || (c.credentials != nil && u.Path == credentialPath) || (b != nil && (b.Contains(u.Path) || webfrontend.IsDocumentPath(u.Path))) || c.cachedResource(raw)
 		},
 		ResourceHandler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if trayNotices && r.URL.Path == trayNoticePath {
+				c.serveTrayNotice(w, r)
+				return
+			}
 			if settings && r.URL.Path == closeBehaviorPath {
 				c.serveCloseBehavior(w, r)
 				return
@@ -191,13 +199,13 @@ func (c *client) showGuestPanel(panel *guestPanel) {
 	window := mygo.NewWindow(mygo.WindowOptions{
 		Title: "旅人营地", Width: 420, Height: 460,
 		UseContentSize: true, Frameless: true, DisableResize: true, DisableMaximize: true,
-		BackgroundColor: "#ffffff", Content: ui.View(panel.View),
+		BackgroundColor: "#ffffff", Content: ui.View(panel.View), Hidden: true,
 	})
 	panel.resourceDir = c.resourceDir
 	panel.Attach(window)
 	previous := c.setMainWindow(window, true, nil)
 	window.OnClosed(panel.Close)
-	window.Show()
+	c.showReadyWindow(window)
 	if previous != nil {
 		previous.Destroy()
 	}
@@ -359,8 +367,8 @@ func (c *client) handleWindowCommand(window *mygo.Window, raw string) bool {
 			default:
 			}
 		}
-		if tool && !offline && !window.IsVisible() {
-			window.Show()
+		if tool && !offline {
+			c.showReadyWindow(window)
 		}
 		if !offline && (tool || (main && !guest)) {
 			c.startConnected()
@@ -374,8 +382,8 @@ func (c *client) handleWindowCommand(window *mygo.Window, raw string) bool {
 					window.Destroy()
 				}
 			}
-		} else if main && (offline || !guest) && !window.IsVisible() {
-			window.Show()
+		} else if main && (offline || !guest) {
+			c.showReadyWindow(window)
 		}
 	}()
 	return true

@@ -35,7 +35,7 @@ func (c *client) showPermissionPrompt() {
 		c.closePermissionPrompts()
 		return
 	}
-	if c.permissionWindow != nil || len(c.permissionQueue) == 0 {
+	if c.inTray.Load() || c.permissionWindow != nil || len(c.permissionQueue) == 0 {
 		return
 	}
 	pending := c.permissionQueue[0]

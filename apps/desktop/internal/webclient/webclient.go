@@ -61,7 +61,7 @@ type client struct {
 	permissionFontPending   bool
 	inTray                  atomic.Bool
 	tray                    *mygo.Tray
-	trayCancel              context.CancelFunc
+	trayWindows             map[*mygo.Window]bool
 	trayClosing             bool
 	closeBehavior           *closeBehaviorStore
 	quitting                bool
@@ -136,7 +136,7 @@ func (c *client) configurePage(window *mygo.Window, tool bool) {
 			c.maintenanceRetries.Store(window, c.maintenanceReturnURL(window))
 			if c.mainNeedsMaintenanceDocument(window) {
 				c.maintenanceState.Store(true)
-				window.Show()
+				c.showReadyWindow(window)
 				return
 			}
 			e.PreventDefault()
