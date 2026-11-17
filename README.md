@@ -1,6 +1,6 @@
 # 旅人营地（trekker-camp）
 
-代码仓库：[stellasora-cafe/trekker-camp](https://github.com/stellasora-cafe/trekker-camp)。
+本仓库维护旅人营地网站、服务端及其部署工具。桌面客户端源码与安装器见 [trekker-camp-desktop](https://github.com/stellasora-cafe/trekker-camp-desktop)。
 
 面向星塔旅人（Stella Sora）简中玩家的第三方社区，基于 [Misskey](https://github.com/misskey-dev/misskey) 定制，由项目团队维护。默认开发分支为 `master`。
 
@@ -12,7 +12,7 @@
 
 代码按各目录的适用许可证提供，主体沿用 [AGPL-3.0](LICENSE)，`misskey-js` 等独立包遵循各自声明。使用者依照适用许可证运行、修改和再分发代码的权利保持不变。本站运行版本的完整对应源码与构建脚本保持可获取。
 
-营地 Logo、站点图标和魔王界面插图随公开代码分发，来源记录见 [公开素材说明](apps/misskey/packages/frontend/assets/trekker-camp/RIGHTS.md)。其他独立授权的美术、字体和音频按[素材管理约定](ASSETS.md)分别管理；素材和品牌使用遵循各自授权。Misskey 的版权声明与第三方许可记录保留在对应文件中。
+营地 Logo、站点图标和魔王界面插图随公开代码分发，来源记录见 [公开素材说明](packages/frontend/assets/trekker-camp/RIGHTS.md)。其他独立授权的美术、字体和音频按[素材管理约定](ASSETS.md)分别管理；素材和品牌使用遵循各自授权。Misskey 的版权声明与第三方许可记录保留在对应文件中。
 
 ## 文档入口
 
@@ -24,20 +24,19 @@
 | [维护方向](ROADMAP.md) | 产品范围与任务安排 |
 | [安全说明](SECURITY.md) | 本站安全问题的报告与处理 |
 | [AI 代理指南](AGENTS.md) | AI 工作规则与检查要求 |
-| [社区应用](apps/misskey/README.md) | 应用内部目录与命令 |
 
 ## 仓库结构
 
 | 目录 | 用途 |
 | --- | --- |
-| `apps/misskey/` | 社区应用：后端、前端、SDK、语言文件和构建脚本 |
-| `apps/` | 独立应用目录，按本站需求添加 |
-| `packages/` | 独立插件与共享包 |
+| `packages/` | Misskey 后端、Web 前端、嵌入前端及 SDK |
+| `packages-private/` | 开发和 CI 工具 |
+| `locales/` | 界面语言资源 |
 | `scripts/` | 仓库检查、素材管理和源码打包 |
 | `.config/` | 本地运行配置 |
 | `private-assets/public/` | 独立授权的运行时素材，不进入公开 Git 或应用包 |
 
-项目使用 pnpm workspace，共用根目录的 `pnpm-workspace.yaml` 和 `pnpm-lock.yaml`。新增应用或共享包须有明确的本站需求，目录约定见 [packages/README.md](packages/README.md)。
+网站使用 pnpm workspace 管理 Misskey 内部包。`pnpm build` 同时构建网站和供桌面客户端在线加载的前端资源。
 
 ## 本地开发
 

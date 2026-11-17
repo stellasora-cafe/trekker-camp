@@ -29,7 +29,7 @@ X-Camp-Desktop-Version: 0.1.0
 X-Camp-Host-Api: 2
 ```
 
-版本号是安装的桌面宿主版本；`X-Camp-Host-Api` 是该宿主支持的前端协议版本。当前服务端要求宿主版本至少为 `0.1.0`、协议恰为 `2`。这些要求由 `apps/misskey/packages/backend/src/server/desktop-compatibility.ts` 统一维护。兼容响应包含原有 `revision`、`sha256`、`size`、`archive` 字段，以及 `minimumVersion`、`hostApi`、`serverVersion`。清单不缓存；归档仍按哈希下载。前端尚未发布或归档声明的协议与当前服务端不一致时返回 HTTP 503，客户端保留重试入口。
+版本号是安装的桌面宿主版本；`X-Camp-Host-Api` 是该宿主支持的前端协议版本。当前服务端要求宿主版本至少为 `0.1.0`、协议恰为 `2`。这些要求由 `packages/backend/src/server/desktop-compatibility.ts` 统一维护。兼容响应包含原有 `revision`、`sha256`、`size`、`archive` 字段，以及 `minimumVersion`、`hostApi`、`serverVersion`。清单不缓存；归档仍按哈希下载。前端尚未发布或归档声明的协议与当前服务端不一致时返回 HTTP 503，客户端保留重试入口。
 
 所有 `/api/client/<endpoint>` 请求在 `X-Camp-Client: desktop-v1` 之外也必须携带上述两个版本请求头。实时连接 `/client-streaming` 支持相同请求头；标准 WebSocket API 通过查询参数发送版本，例如 `/client-streaming?client=desktop-v1&desktopVersion=0.1.0&hostApi=2`。请求头优先，显式的不兼容请求头不会被查询参数覆盖。
 

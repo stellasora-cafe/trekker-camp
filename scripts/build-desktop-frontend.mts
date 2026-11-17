@@ -6,19 +6,19 @@
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { build, loadConfigFromFile } from '../apps/misskey/packages/frontend/node_modules/vite/dist/node/index.js';
-import { LocaleInliner } from '../apps/misskey/packages/frontend-builder/locale-inliner.js';
-import { createLogger } from '../apps/misskey/packages/frontend-builder/logger.js';
-import locales from '../apps/misskey/packages/i18n/built/index.js';
+import { build, loadConfigFromFile } from '../packages/frontend/node_modules/vite/dist/node/index.js';
+import { LocaleInliner } from '../packages/frontend-builder/locale-inliner.js';
+import { createLogger } from '../packages/frontend-builder/logger.js';
+import locales from '../packages/i18n/built/index.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const frontend = path.join(root, 'apps/misskey/packages/frontend');
-const output = path.join(root, 'apps/misskey/built/desktop-frontend-staging');
+const frontend = path.join(root, 'packages/frontend');
+const output = path.join(root, 'built/desktop-frontend-staging');
 const viteOutput = path.join(output, 'vite');
-const meta = JSON.parse(await fs.readFile(path.join(root, 'apps/misskey/package.json'), 'utf8'));
+const meta = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'));
 
 // This output is generated inside the server build directory.
-if (!output.startsWith(path.join(root, 'apps/misskey/built') + path.sep)) throw new Error('Invalid frontend output path');
+if (!output.startsWith(path.join(root, 'built') + path.sep)) throw new Error('Invalid frontend output path');
 await fs.rm(output, { recursive: true, force: true });
 await fs.mkdir(output, { recursive: true });
 
@@ -74,7 +74,7 @@ async function copyPublic(source: string, destination: string) {
 }
 
 await copyPublic(path.join(frontend, 'assets'), path.join(output, 'client-assets'));
-await copyPublic(path.join(root, 'apps/misskey/packages/backend/assets'), path.join(output, 'static-assets'));
+await copyPublic(path.join(root, 'packages/backend/assets'), path.join(output, 'static-assets'));
 await fs.copyFile(path.join(output, 'client-assets/trekker-camp/branding/favicon-v1.ico'), path.join(output, 'favicon.ico'));
 await fs.copyFile(path.join(output, 'client-assets/trekker-camp/branding/apple-touch-icon-v1.png'), path.join(output, 'apple-touch-icon.png'));
 await fs.mkdir(path.join(output, 'assets/locales'), { recursive: true });

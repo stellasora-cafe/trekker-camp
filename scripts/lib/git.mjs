@@ -94,7 +94,7 @@ export function gitPaths(args, options = {}) {
 }
 
 /**
- * Exclude byte-identical relocations from content checks during the monorepo move.
+ * Exclude byte-identical relocations from the former apps/misskey directory.
  * Hash paths in one Git call instead of reading each original blob separately.
  * @param {string[]} files
  * @param {string} base
@@ -106,9 +106,8 @@ export function filterUnchangedRelocations(files, base) {
 		const [metadata, path] = entry.split('\t');
 		return [path, metadata.split(' ')[2]];
 	}));
-	const moved = files.filter(file => file.startsWith(prefix)
-		&& originals.has(file.slice(prefix.length)) && !originals.has(file)
-		&& !existsSync(file.slice(prefix.length)) && existsSync(file) && statSync(file).isFile());
+	const moved = files.filter(file => originals.has(prefix + file) && !originals.has(file)
+		&& !existsSync(prefix + file) && existsSync(file) && statSync(file).isFile());
 	if (moved.length === 0) return files;
 	const hashes = execFileSync('git', ['hash-object', '--stdin-paths'], {
 		input: moved.map(file => JSON.stringify(file)).join('\n') + '\n',
@@ -116,7 +115,7 @@ export function filterUnchangedRelocations(files, base) {
 	}).trim().split('\n');
 	const unchanged = new Set();
 	moved.forEach((file, index) => {
-		const oldPath = file.slice(prefix.length);
+		const oldPath = prefix + file;
 		if (hashes[index] === originals.get(oldPath)) {
 			unchanged.add(file);
 			unchanged.add(oldPath);

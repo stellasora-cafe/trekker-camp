@@ -12,8 +12,8 @@
 
 ## 旅人营地覆盖规则（优先于下文上游规则）
 
-1. **产品文案源语言是简体中文 `apps/misskey/locales/zh-CN.yml`**
-   - AI 和开发者可以、也应当编辑 `apps/misskey/locales/zh-CN.yml`。
+1. **产品文案源语言是简体中文 `locales/zh-CN.yml`**
+   - AI 和开发者可以、也应当编辑 `locales/zh-CN.yml`。
    - 禁止手动编辑其他语言 YAML（`en-US.yml`、`zh-TW.yml` 等；`ja-JP.yml` 仅用于上游同步），避免与上游或 Crowdin 同步相互覆盖。
    - 合入上游文案时，先合并 `ja-JP.yml`（上游源语言），再将旅人营地需要的键写入 `zh-CN.yml`。
    - 前端新增国际化键时，写入 `zh-CN.yml`，并通过实例配置或默认语言设置保证运行时默认使用简体中文。
@@ -33,13 +33,13 @@
    - 开发和部署约定见 [ASSETS.md](ASSETS.md)。网页素材放在 `private-assets/public/`，原稿与授权记录放在 `public/` 外；两个目录及素材链接均不提交到公开仓库。
    - 团队素材库是 `stellasora-cafe/trekker-camp-assets`（Private，`master`）。首次准备团队开发环境用 `pnpm assets:pull`，以后按需快进同步；它会保留未提交素材和开发分支。无素材库权限时可用 `pnpm assets:link` 创建空目录。`pnpm dev` 离线建立或复用链接，通过 `/client-assets/camp/` 加载。多个 worktree 可通过 `CAMP_ASSETS_DIR` 共用已有的 `public` 目录。
    - 保持素材运行时加载，不将其 import、内嵌或复制进 JS/CSS 包、公开资源目录及镜像。程序代码、样式和构建脚本保持公开；没有私有素材时仍可构建、运行并使用默认资源或回退。
-   - 桌面安装器只携带宿主、内置关于页、关于页图像、许可白名单中的 MiSans 字体和法律声明。原始素材与前端热更新包分开管理。原创宿主采用 Apache-2.0，远端 Misskey 前端保留 AGPL-3.0-only，MyGo 保留 MIT，独立小工具按各自许可发布。详见 [桌面客户端许可](apps/desktop/LICENSING.md)。
+   - 桌面安装器只携带宿主、内置关于页、关于页图像、许可白名单中的 MiSans 字体和法律声明。原始素材与前端热更新包分开管理。原创宿主采用 Apache-2.0，远端 Misskey 前端保留 AGPL-3.0-only，MyGo 保留 MIT，独立小工具按各自许可发布。详见 [桌面客户端许可](https://github.com/stellasora-cafe/trekker-camp-desktop/blob/master/LICENSING.md)。
    - Docker 使用 `compose.assets.yml` 只读挂载素材。不要将整个素材仓库（含原稿、授权记录或 `.git`）暴露为静态目录。
    - 不强制添加忽略的素材或链接，不创建指向私有素材库的 Git 子模块。修改素材机制、忽略规则或部署挂载时运行 `pnpm assets:test`；交付流程自动执行 `assets:check`。
    - 素材与代码分别提交。素材库的 `master` 更新在配置服务器后会自动同步 `public/`，未经授权不推送素材库 `master`。素材库的 Agent 规则与授权记录分别位于其 `AGENTS.md` 和 `RIGHTS.md`；不将 SSH 凭据加入任何仓库。
 
 7. **本站 VPS 使用部署 CLI**
-   - 服务端每次合并到 `master` 后自动生成干净的 Actions 构建产物；`camp update` 消费最新成功且未过期的服务端产物和固定 digest 的私有镜像，不在服务器拉取主仓库。桌面独立使用 `desktop-v*` 标签及公开 Release；生产部署仍需用户授权。
+   - 服务端每次合并到 `master` 后自动生成干净的 Actions 构建产物；`camp update` 消费最新成功且未过期的服务端产物和固定 digest 的私有镜像，不在服务器拉取主仓库。桌面版本在 [桌面仓库](https://github.com/stellasora-cafe/trekker-camp-desktop) 发布；生产部署仍需用户授权。
    - 运维入口和存储布局见 [DEPLOY.zh-CN.md](DEPLOY.zh-CN.md)。终端中直接运行 `camp` 打开交互菜单；Agent 自动化使用子命令。首次部署用 `camp install`，应用与素材更新用 `camp update`，CLI 自身更新用 `camp self-update`，版本用 `camp version` 查看。
    - 首次配置使用仓库随附的 Misskey Docker 示例模板，初始化调用 `pnpm run init`，Web 使用镜像默认 `migrateandstart` 入口；更新先备份、独立执行官方迁移，再启动并检查健康状态。保留已有实例配置和数据。
    - 启停使用 `camp start`、`camp stop`、`camp restart`；开机自启使用 `camp autostart on/off`，状态由 `camp status` 显示。保留数据目录中的 `.config/compose.autostart.yml`，启停和自启设置与更新、备份共用锁；不要通过停用整个 Docker 服务来关闭本站自启。
@@ -63,16 +63,16 @@
    - 适用类型：新增的 `.ts`、`.js`、`.cjs`、`.mjs`、`.vue`、`.scss`、`.html` 文件。
    - 适用范围和判断逻辑由 [scripts/check-spdx.mjs](scripts/check-spdx.mjs) 统一管理。
    - 执行一次 `node scripts/check-spdx.mjs`，缺失时使用 `--fix` 补齐。得到 `SPDX: OK` 后无需额外人工检查。
-   - `apps/misskey/packages/misskey-js` 是 MIT 许可证子包，不应统一添加 AGPL 头；遵循该子包的 `package.json`、`LICENSE` 和已有文件头。
+   - `packages/misskey-js` 是 MIT 许可证子包，不应统一添加 AGPL 头；遵循该子包的 `package.json`、`LICENSE` 和已有文件头。
 
-2. **禁止手动编辑 `apps/misskey/locales/zh-CN.yml` 和用于上游同步的 `apps/misskey/locales/ja-JP.yml` 之外的语言 YAML**
+2. **禁止手动编辑 `locales/zh-CN.yml` 和用于上游同步的 `locales/ja-JP.yml` 之外的语言 YAML**
    - 旅人营地的产品文案源文件是 **`zh-CN.yml`**，AI 可以编辑。
    - `ja-JP.yml` 保留为上游 Misskey 的同步入口；本 fork 默认关闭 Crowdin 流程。
    - 禁止手动编辑 `en-US.yml`、`zh-TW.yml` 等其他语言，避免同步覆盖和无关差异。
-   - 上游依据见 [apps/misskey/locales/README.md](apps/misskey/locales/README.md) 和 [crowdin.yml](crowdin.yml)；本仓库以“旅人营地覆盖规则”为准。
+   - 上游依据见 [locales/README.md](locales/README.md) 和 [crowdin.yml](crowdin.yml)；本仓库以“旅人营地覆盖规则”为准。
 
 3. **禁止修改已合并的迁移文件**
-   - 适用范围：`apps/misskey/packages/backend/migration/{unixMs}-{name}.js` 中已合并到 `develop` 或 `master` 的文件。
+   - 适用范围：`packages/backend/migration/{unixMs}-{name}.js` 中已合并到 `develop` 或 `master` 的文件。
    - 改写历史会导致生产环境严重的数据不一致。
    - 需要修改数据库结构时，使用新时间戳创建迁移文件（`node -e "console.log(Date.now())"`）。
    - 新迁移必须同时实现 `up()` 和 `down()`，并通过 `pnpm --filter backend check-migrations`，使用 TypeORM 架构构建器检查待执行 DDL。
@@ -96,8 +96,8 @@
 
 无论已执行哪些上游技能、掌握多少先验知识或记忆，以下要求均适用。
 
-13. 编辑或添加 `apps/misskey/packages/backend/` 下的文件前，必须阅读 `working-on-backend` 技能。
-14. 编辑或添加 `apps/misskey/packages/frontend/` 下的文件前，必须阅读 `working-on-frontend` 技能。
+13. 编辑或添加 `packages/backend/` 下的文件前，必须阅读 `working-on-backend` 技能。
+14. 编辑或添加 `packages/frontend/` 下的文件前，必须阅读 `working-on-frontend` 技能。
     - 技能与参考文档统一以 `zh-CN.yml` 为产品文案源语言，`ja-JP.yml` 仅用于上游同步。
 15. 提交、创建 PR 或将工作交还用户前，必须阅读 `shipping-misskey-change` 技能。
 16. 创建 Issue 或 PR 前，必须阅读 `creating-issues-and-prs` 技能，包括漏洞报告规则。
@@ -109,10 +109,10 @@
 所有代理都必须阅读 [shipping-misskey-change 技能](.claude/skills/shipping-misskey-change/SKILL.md)。即使当前环境无法使用技能，也必须执行以下检查：
 
 1. **lint 与测试**：最后从所属包根目录，对受 ESLint 检查的改动文件运行一次 `eslint --quiet`；实现改动需运行最相关的测试。整个包或仓库的 lint 及更大范围测试为可选项。
-2. **后端 API 修改**：执行 `pnpm build-misskey-js-with-types`，将 `apps/misskey/packages/misskey-js/src/autogen/` 的差异一并提交。
+2. **后端 API 修改**：执行 `pnpm build-misskey-js-with-types`，将 `packages/misskey-js/src/autogen/` 的差异一并提交。
 3. **实体或迁移修改**：`pnpm --filter backend check-migrations` 通过且待执行 DDL 为 0；新迁移已同时实现 `up()` 和 `down()`。
 4. **SPDX**：`node scripts/check-spdx.mjs` 返回 `SPDX: OK`。
-5. **语言文件安全**：改动集合中只允许出现 `apps/misskey/locales/zh-CN.yml`，以及仅用于上游同步的 `apps/misskey/locales/ja-JP.yml`；不混入其他语言 YAML 的差异。
+5. **语言文件安全**：改动集合中只允许出现 `locales/zh-CN.yml`，以及仅用于上游同步的 `locales/ja-JP.yml`；不混入其他语言 YAML 的差异。
 6. **[CHANGELOG](.claude/skills/shipping-misskey-change/references/tasks/changelog-update.md)**：用户未明确要求时不编辑。存在用户可感知的修改时，在交接中提供一行候选条目。
 7. **素材分发**：`pnpm assets:check` 通过，确认私有素材和本地链接没有进入 Git 索引；该项已纳入 `node scripts/check-shipping.mjs`。
 

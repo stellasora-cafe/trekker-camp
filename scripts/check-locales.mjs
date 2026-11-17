@@ -16,8 +16,10 @@ import { DEFAULT_INTEGRATION_REFS, filterUnchangedRelocations, findClosestMergeB
  */
 export function runLocaleSafety(changedFiles) {
 	const badLocales = changedFiles.filter((file) => (
-		file.startsWith('apps/misskey/locales/') &&
+		(file.startsWith('locales/') || file.startsWith('apps/misskey/locales/')) &&
 		file.endsWith('.yml') &&
+		file !== 'locales/zh-CN.yml' &&
+		file !== 'locales/ja-JP.yml' &&
 		file !== 'apps/misskey/locales/zh-CN.yml' &&
 		file !== 'apps/misskey/locales/ja-JP.yml'
 	));

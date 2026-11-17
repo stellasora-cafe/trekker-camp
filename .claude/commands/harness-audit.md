@@ -61,19 +61,19 @@ pnpm --filter backend check-migrations
 #    endpoint-list.ts 使用 export * as 形式注册端点。
 #    每个文件对应一行，比较递归 TypeScript 文件数与 export * as 行数。
 #    排除非端点的 *.test.ts 测试文件。
-endpoint_files=$(find apps/misskey/packages/backend/src/server/api/endpoints -type f -name '*.ts' ! -name '*.test.ts' | wc -l)
-list_entries=$(grep -cE "^export \* as " apps/misskey/packages/backend/src/server/api/endpoint-list.ts)
+endpoint_files=$(find packages/backend/src/server/api/endpoints -type f -name '*.ts' ! -name '*.test.ts' | wc -l)
+list_entries=$(grep -cE "^export \* as " packages/backend/src/server/api/endpoint-list.ts)
 echo "endpoints (recursive): $endpoint_files / endpoint-list.ts entries: $list_entries"
 # 数量相同则满分；有差异时定位遗漏：
 comm -23 \
-  <(find apps/misskey/packages/backend/src/server/api/endpoints -type f -name '*.ts' ! -name '*.test.ts' \
+  <(find packages/backend/src/server/api/endpoints -type f -name '*.ts' ! -name '*.test.ts' \
     | sed -E 's|.*/endpoints/||;s|\.ts$||' | sort -u) \
-  <(grep -oE "^export \* as '[^']+'" apps/misskey/packages/backend/src/server/api/endpoint-list.ts \
+  <(grep -oE "^export \* as '[^']+'" packages/backend/src/server/api/endpoint-list.ts \
     | sed -E "s/^export \* as '([^']+)'/\1/" | sort -u)
 # 输出为未注册端点，无输出时满分。
 
 # 5. [Quality Gates] 混入 console.log
-grep -rn 'console\.\(log\|debug\)' apps/misskey/packages/backend/src apps/misskey/packages/frontend/src 2>/dev/null \
+grep -rn 'console\.\(log\|debug\)' packages/backend/src packages/frontend/src 2>/dev/null \
   | grep -v 'node_modules\|test\|.spec\.\|.test\.' | wc -l
 # → 理想值为 0
 ```

@@ -38,7 +38,7 @@ for (const scenario of [
 		const git = (...args) => execFileSync('git', args, { cwd: repo, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 		git('init', '--quiet');
 		const relocating = scenario.state.startsWith('relocated');
-		let file = join(repo, relocating ? 'locales' : 'apps/misskey/locales', `${scenario.file}.yml`);
+		let file = join(repo, relocating ? 'apps/misskey/locales' : 'locales', `${scenario.file}.yml`);
 		mkdirSync(dirname(file), { recursive: true });
 		writeFileSync(join(repo, 'README.md'), 'Locale fixture\n');
 		if (scenario.state !== 'untracked') writeFileSync(file, 'hello: initial\n');
@@ -46,7 +46,7 @@ for (const scenario of [
 		git('commit', '--quiet', '-m', 'Initial fixture');
 		const base = git('rev-parse', 'HEAD');
 		if (relocating) {
-			const destination = join(repo, 'apps/misskey/locales', `${scenario.file}.yml`);
+			const destination = join(repo, 'locales', `${scenario.file}.yml`);
 			mkdirSync(dirname(destination), { recursive: true });
 			renameSync(file, destination);
 			file = destination;
@@ -60,6 +60,6 @@ for (const scenario of [
 		const result = spawnSync(process.execPath, [script, '--base', base], { cwd: repo, env, encoding: 'utf8' });
 		assert.equal(result.status, scenario.status, result.stderr);
 		if (scenario.status === 0) assert.match(result.stdout, /Locale safety: PASS/);
-		else assert.match(result.stderr, new RegExp(`forbidden locale change: apps/misskey/locales/${scenario.file}\\.yml`));
+		else assert.match(result.stderr, new RegExp(`forbidden locale change: locales/${scenario.file}\\.yml`));
 	});
 }

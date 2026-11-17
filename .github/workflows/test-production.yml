@@ -27,7 +27,7 @@ jobs:
         node-version-file: '.node-version'
         cache: 'pnpm'
     - name: Test startup and migration orchestration
-      run: node --test apps/misskey/scripts/start.test.mjs
+      run: node --test scripts/start.test.mjs
     - run: pnpm i --frozen-lockfile
     - name: Check pnpm-lock.yaml
       run: git diff --exit-code pnpm-lock.yaml

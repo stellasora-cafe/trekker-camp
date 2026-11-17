@@ -34,10 +34,10 @@ pnpm --filter backend test:e2e
 
 后端测试前按[环境指南](SETUP.zh-CN.md#测试用配置)准备 `.config/test.yml` 和独立测试数据库。测试会使用测试数据，不连接生产数据库。仅执行当前改动需要的测试。
 
-- API 定义变化：运行 `pnpm build-misskey-js-with-types`，一并提交 `apps/misskey/packages/misskey-js/src/autogen/` 的差异。
+- API 定义变化：运行 `pnpm build-misskey-js-with-types`，一并提交 `packages/misskey-js/src/autogen/` 的差异。
 - 实体或迁移变化：运行 `pnpm --filter backend check-migrations`，待执行 DDL 为 0；新迁移同时实现 `up()` 和 `down()`。
 - 素材机制、忽略规则或部署挂载变化：运行 `pnpm assets:test`。
-- 产品文案：只编辑 `apps/misskey/locales/zh-CN.yml`。`ja-JP.yml` 仅用于同步上游，其他语言 YAML 不手动修改。
+- 产品文案：只编辑 `locales/zh-CN.yml`。`ja-JP.yml` 仅用于同步上游，其他语言 YAML 不手动修改。
 - 用户未要求时不修改 `CHANGELOG.md`；用户可感知的修改在交接中附一行候选条目。
 
 具体检查见 [shipping-misskey-change](.claude/skills/shipping-misskey-change/SKILL.md)。交接说明实际通过、失败和跳过的检查。

@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths:
-      - apps/misskey/locales/**
+      - locales/**
       - scripts/check-locales*.mjs
       - scripts/check-shipping.mjs
       - scripts/lib/git.mjs
@@ -14,7 +14,7 @@ on:
     branches:
       - master
     paths:
-      - apps/misskey/locales/**
+      - locales/**
       - scripts/check-locales*.mjs
       - scripts/check-shipping.mjs
       - scripts/lib/git.mjs

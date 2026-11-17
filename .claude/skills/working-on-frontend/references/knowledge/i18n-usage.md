@@ -12,7 +12,7 @@
 
 ## 基本用法
 
-文案必须通过 [i18n.ts](../../../../../apps/misskey/packages/frontend/src/i18n.ts) 引用。
+文案必须通过 [i18n.ts](../../../../../packages/frontend/src/i18n.ts) 引用。
 无参数使用 ts 属性，有参数使用 tsx 函数。无参数键通过 tsx 调用会报类型错误；带参数键通过 ts 引用可能不报错，却将占位符原样显示。
 
 无参数：
@@ -64,10 +64,10 @@ async function onDelete() {
 语言值可包含 b、br、strong 等标签，在界面通过 v-html 或 Mfm 渲染：
 
 ```yaml
-# apps/misskey/locales/zh-CN.yml
+# locales/zh-CN.yml
 poweredByMisskeyDescription: "{name} 是开源平台 <b>Misskey</b> 的一个服务器。"
 
-# apps/misskey/locales/zh-CN.yml (改行 + br)
+# locales/zh-CN.yml (改行 + br)
 driveAboutTip: "网盘保存之前上传的文件。<br>\n发帖时可重复使用。<br>\n<b>删除文件会影响引用它的帖子。</b>"
 ```
 
@@ -82,7 +82,7 @@ driveAboutTip: "网盘保存之前上传的文件。<br>\n发帖时可重复使�
 
 ### 响应式引用与动态键
 
-随时间等状态切换键时，通过 computed 和方括号动态选择，参考 [MkPoll.vue](../../../../../apps/misskey/packages/frontend/src/components/MkPoll.vue)：
+随时间等状态切换键时，通过 computed 和方括号动态选择，参考 [MkPoll.vue](../../../../../packages/frontend/src/components/MkPoll.vue)：
 
 ```ts
 const timer = computed(() => i18n.tsx._poll[
@@ -111,7 +111,7 @@ _poll:
 
 ### 非法标识符键
 
-数字开头等不适合点号访问的键使用方括号，参考 [MkSignin.totp.vue](../../../../../apps/misskey/packages/frontend/src/components/MkSignin.totp.vue)：
+数字开头等不适合点号访问的键使用方括号，参考 [MkSignin.totp.vue](../../../../../packages/frontend/src/components/MkSignin.totp.vue)：
 
 ```vue
 <div :class="$style.totpDescription">{{ i18n.ts['2fa'] }}</div>
@@ -128,7 +128,7 @@ _poll:
 
 ### 将已翻译字符串作为参数
 
-参考 [MkSignupDialog.rules.vue](../../../../../apps/misskey/packages/frontend/src/components/MkSignupDialog.rules.vue)：
+参考 [MkSignupDialog.rules.vue](../../../../../packages/frontend/src/components/MkSignupDialog.rules.vue)：
 
 ```ts
 i18n.tsx.iHaveReadXCarefullyAndAgree({ x: i18n.ts.serverRules })
@@ -142,20 +142,20 @@ i18n.tsx.iHaveReadXCarefullyAndAgree({ x: i18n.ts.serverRules })
 
 ## 语言文件维护
 
-营地产品文案以 `apps/misskey/locales/zh-CN.yml` 为源语言。`ja-JP.yml` 保留为上游同步入口，其他语言 YAML 不手动编辑。本项目默认关闭 Crowdin 流程。
+营地产品文案以 `locales/zh-CN.yml` 为源语言。`ja-JP.yml` 保留为上游同步入口，其他语言 YAML 不手动编辑。本项目默认关闭 Crowdin 流程。
 
 新增键前先搜索已有文案。调整键名时同步迁移调用位置，检查简体中文显示与繁体中文缺失时的简中回退；避免为文案改写无谓更换已有键名。删除旧键前确认代码中已无引用。
 
 执行 `node scripts/check-locales.mjs` 检查语言文件改动。发现误改时仅撤回本次引入的内容，保留用户已有工作。
 
-详细规则见[语言文件说明](../../../../../apps/misskey/locales/README.md)。
+详细规则见[语言文件说明](../../../../../locales/README.md)。
 
 ## 故障排查
 
 ### Property '<key>' does not exist on type 'Locale'
 
 ```
-apps/misskey/packages/frontend/src/components/MkXxx.vue
+packages/frontend/src/components/MkXxx.vue
 > i18n.ts.newKey
   Property 'newKey' does not exist on type 'Locale'.
 ```
@@ -166,7 +166,7 @@ apps/misskey/packages/frontend/src/components/MkXxx.vue
 - 手动执行 pnpm --filter i18n generate。
 - 通过前端 lint 检查。
 
-实现见 [generateLocaleInterface.ts](../../../../../apps/misskey/packages/i18n/scripts/generateLocaleInterface.ts)，参数提取正则为 /\{(\w+)\}/g。
+实现见 [generateLocaleInterface.ts](../../../../../packages/i18n/scripts/generateLocaleInterface.ts)，参数提取正则为 /\{(\w+)\}/g。
 
 ### ts 与 tsx 混用
 
@@ -184,7 +184,7 @@ i18n.tsx.save({...})
 <!-- 界面显示“取消关注 {name} 吗？”，其中 {name} 未被替换 -->
 ```
 
-[共享 i18n 实现](../../../../../apps/misskey/packages/frontend-shared/js/i18n.ts)的 Tsx<T> 仅将 ParameterizedString<P> 键暴露为函数。
+[共享 i18n 实现](../../../../../packages/frontend-shared/js/i18n.ts)的 Tsx<T> 仅将 ParameterizedString<P> 键暴露为函数。
 按 YAML 中是否存在占位符选择：
 
 | 值 | 正确调用 |
@@ -194,7 +194,7 @@ i18n.tsx.save({...})
 
 ### Unexpected locale key: <key>
 
-开发模式 Proxy 检测到访问不存在的键。补充 zh-CN.yml 中的键或修复拼写，见[共享 i18n 实现](../../../../../apps/misskey/packages/frontend-shared/js/i18n.ts)。
+开发模式 Proxy 检测到访问不存在的键。补充 zh-CN.yml 中的键或修复拼写，见[共享 i18n 实现](../../../../../packages/frontend-shared/js/i18n.ts)。
 
 ### Missing locale parameters: <param> at <key>
 
@@ -221,18 +221,18 @@ driveAboutTip: "网盘保存之前上传的文件。<br>\n发帖时可将文件�
 
 ### 覆盖 _lang_
 
-_lang_ 是语言自称的保留键，位于 [生成接口](../../../../../apps/misskey/packages/i18n/src/autogen/locale.ts)开头。新增功能应使用其他键名。
+_lang_ 是语言自称的保留键，位于 [生成接口](../../../../../packages/i18n/src/autogen/locale.ts)开头。新增功能应使用其他键名。
 
 ### 修改后界面没有更新
 
-原因可能是只运行了前端 watch，i18n 未监听；或浏览器缓存了 apps/misskey/built/_frontend_dist_/locales/*.json。
+原因可能是只运行了前端 watch，i18n 未监听；或浏览器缓存了 built/_frontend_dist_/locales/*.json。
 使用根目录 pnpm dev 启动前后端及 i18n 监听。仍无变化时清除浏览器缓存，或手动运行 pnpm --filter i18n build。
 
 ## 限制与补充
 
 ### 不支持 ICU MessageFormat
 
-[生成器](../../../../../apps/misskey/packages/i18n/scripts/generateLocaleInterface.ts)仅识别 /\{(\w+)\}/g，即简单 {paramName} 替换。
+[生成器](../../../../../packages/i18n/scripts/generateLocaleInterface.ts)仅识别 /\{(\w+)\}/g，即简单 {paramName} 替换。
 
 以下 ICU 写法会作为普通字符串显示：
 
@@ -265,7 +265,7 @@ const text = files.length === 1
 位于每个语言文件顶层开头，存放该语言的自称：
 
 ```yaml
-# apps/misskey/locales/zh-CN.yml (顶层开头)
+# locales/zh-CN.yml (顶层开头)
 _lang_: "简体中文"
 ```
 
@@ -273,7 +273,7 @@ _lang_: "简体中文"
 
 ### Storybook
 
-Storybook 使用独立打包流程，通过 [preload-locale.ts](../../../../../apps/misskey/packages/frontend/.storybook/preload-locale.ts) 将 zh-CN 数据写入同目录 locale.ts。
+Storybook 使用独立打包流程，通过 [preload-locale.ts](../../../../../packages/frontend/.storybook/preload-locale.ts) 将 zh-CN 数据写入同目录 locale.ts。
 
 - 预加载简体中文文案；其他语言的显示在应用中验证。
 - 新增键后若预加载尚未执行，需重启 Storybook 或先构建 i18n。

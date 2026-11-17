@@ -1,1 +1,1 @@
-web: NODE_ENV=production node apps/misskey/scripts/start.mjs
+web: NODE_ENV=production node scripts/start.mjs

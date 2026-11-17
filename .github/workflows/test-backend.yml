@@ -6,16 +6,16 @@ on:
       - master
       - develop
     paths:
-      - apps/misskey/packages/backend/**
+      - packages/backend/**
       # for permissions
-      - apps/misskey/packages/misskey-js/**
+      - packages/misskey-js/**
       - .github/workflows/test-backend.yml
       - .github/misskey/test.yml
   pull_request:
     paths:
-      - apps/misskey/packages/backend/**
+      - packages/backend/**
       # for permissions
-      - apps/misskey/packages/misskey-js/**
+      - packages/misskey-js/**
       - .github/workflows/test-backend.yml
       - .github/misskey/test.yml
   workflow_dispatch:
@@ -83,7 +83,7 @@ jobs:
       uses: codecov/codecov-action@v7
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-        files: ./apps/misskey/packages/backend/coverage/coverage-final.json
+        files: ./packages/backend/coverage/coverage-final.json
 
   e2e:
     name: E2E tests (backend)
@@ -137,7 +137,7 @@ jobs:
         uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./apps/misskey/packages/backend/coverage/coverage-final.json
+          files: ./packages/backend/coverage/coverage-final.json
 
   migration:
     name: Migration tests (backend)

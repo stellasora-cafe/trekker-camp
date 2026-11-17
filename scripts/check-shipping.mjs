@@ -29,18 +29,18 @@ import { runLocaleSafety } from './check-locales.mjs';
 import { checkPrivateAssets } from './check-private-assets.mjs';
 
 const LINT_TARGETS = [
-	{ root: 'apps/misskey/packages/backend', pattern: /^apps\/misskey\/packages\/backend\/(src|test-federation)\/.*\.ts$/ },
-	{ root: 'apps/misskey/packages/frontend', pattern: /^apps\/misskey\/packages\/frontend\/src\/.*\.(ts|vue)$/ },
-	{ root: 'apps/misskey/packages/frontend-embed', pattern: /^apps\/misskey\/packages\/frontend-embed\/src\/.*\.(ts|vue)$/ },
-	{ root: 'apps/misskey/packages/icons-subsetter', pattern: /^apps\/misskey\/packages\/icons-subsetter\/src\/.*\.ts$/ },
-	{ root: 'apps/misskey/packages/sw', pattern: /^apps\/misskey\/packages\/sw\/src\/.*\.ts$/ },
+	{ root: 'packages/backend', pattern: /^packages\/backend\/(src|test-federation)\/.*\.ts$/ },
+	{ root: 'packages/frontend', pattern: /^packages\/frontend\/src\/.*\.(ts|vue)$/ },
+	{ root: 'packages/frontend-embed', pattern: /^packages\/frontend-embed\/src\/.*\.(ts|vue)$/ },
+	{ root: 'packages/icons-subsetter', pattern: /^packages\/icons-subsetter\/src\/.*\.ts$/ },
+	{ root: 'packages/sw', pattern: /^packages\/sw\/src\/.*\.ts$/ },
 	...['frontend-shared', 'frontend-builder', 'i18n', 'misskey-js', 'misskey-bubble-game', 'misskey-reversi'].map((name) => ({
-		root: `apps/misskey/packages/${name}`,
-		pattern: new RegExp(`^apps/misskey/packages/${name}/.*\\.(js|jsx|ts|tsx)$`),
+		root: `packages/${name}`,
+		pattern: new RegExp(`^packages/${name}/.*\\.(js|jsx|ts|tsx)$`),
 	})),
 	...['changelog-checker', 'diagnostics-backend', 'diagnostics-frontend', 'diagnostics-shared'].map((name) => ({
-		root: `apps/misskey/packages-private/${name}`,
-		pattern: new RegExp(`^apps/misskey/packages-private/${name}/.*\\.(js|jsx|ts|tsx)$`),
+		root: `packages-private/${name}`,
+		pattern: new RegExp(`^packages-private/${name}/.*\\.(js|jsx|ts|tsx)$`),
 	})),
 ];
 

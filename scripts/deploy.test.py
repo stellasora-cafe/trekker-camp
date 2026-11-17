@@ -554,7 +554,7 @@ compose() {
   printf '%s\n' "$*" >> "$TEST_ROOT/events"
   if [[ $* == 'config --no-env-resolution --format json' ]]; then printf '{"services":{}}'; return; fi
   case "$1:$FAILURE" in build:build|pull:pull|exec:backup) return 42 ;; esac
-  if [[ $* == *'web node --input-type=module' ]]; then
+  if [[ $1 == run && $* == *'--workdir /misskey web sh -c '* ]]; then
     cat > "$TEST_ROOT/runtime-check.mjs"
     if [[ $FAILURE == runtime ]]; then return 42; fi
   fi
@@ -859,7 +859,7 @@ writeFileSync(join(dirname(require.resolve('re2')), 'build/Release/re2.node'), '
                 # Each attempt uses a disposable container without service mounts or networking.
                 result = subprocess.run(
                     ["docker", "run", "--rm", "--network", "none", "-i", "--user", "0:0",
-                     "--workdir", "/misskey/apps/misskey/packages/backend", "--entrypoint", "node",
+                     "--workdir", "/misskey/packages/backend", "--entrypoint", "node",
                      os.environ["RUNTIME_TEST_IMAGE"], "--input-type=module"],
                     input=prefix + script, env=self.env, text=True, capture_output=True, timeout=60,
                 )
@@ -956,7 +956,7 @@ compose up -d --no-deps --no-build --pull never --wait --wait-timeout 180 web
         result = self.shell(prelude + '''
 compose exec -T web node --input-type=module <<'JS'
 import assert from 'node:assert/strict';
-import { loadConfig } from '/misskey/apps/misskey/packages/backend/built/config.js';
+import { loadConfig } from '/misskey/packages/backend/built/config.js';
 const config = loadConfig();
 async function post(path, body) {
   const response = await fetch(`http://127.0.0.1:${config.port}/api/${path}`, {
@@ -1589,7 +1589,7 @@ main --dir "$TEST_ROOT/checkout"
         for service, target, source in (
             ("web", "/misskey/files", "files"),
             ("web", "/misskey/.config", ".config"),
-            ("web", "/misskey/apps/misskey/packages/frontend/assets/camp", "private-assets/public"),
+            ("web", "/misskey/packages/frontend/assets/camp", "private-assets/public"),
             ("db", "/var/lib/postgresql", "db"),
             ("redis", "/data", "redis"),
             ("caddy", "/data", "caddy/data"),

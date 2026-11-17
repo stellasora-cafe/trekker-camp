@@ -10,11 +10,11 @@ src-js/
 db/
 .devcontainer/compose.yml
 node_modules/
-apps/misskey/packages/*/node_modules
+packages/*/node_modules
 redis/
 files/
 private-assets
-apps/misskey/packages/frontend/assets/camp
+packages/frontend/assets/camp
 fluent-emojis/
 .pnp.*
 
@@ -29,17 +29,12 @@ fluent-emojis/
 .pnpm-store
 
 .idea/
-apps/misskey/packages/*/.vscode/
-apps/misskey/packages/backend/test/compose.yml
+packages/*/.vscode/
+packages/backend/test/compose.yml
 
 **/node_modules
 **/built
 **/src-js
 
-# Local desktop binaries and browser profiles never enter a server build.
-apps/desktop/artifacts
-apps/desktop/build
-apps/desktop/internal/webfrontend/assets/frontend.zip
-apps/desktop/internal/distribution/assets
+apps/
 release
-apps/desktop/.release-resources

@@ -10,7 +10,7 @@
 
 ## 公开品牌与界面素材
 
-经维护者确认，本次营地横版 Logo、帐篷双星图标及四张魔王界面插图放在 `apps/misskey/packages/frontend/assets/trekker-camp/`，随代码仓库与构建产物分发，通过 `/client-assets/trekker-camp/` 加载。来源与用途见该目录的 [RIGHTS.md](apps/misskey/packages/frontend/assets/trekker-camp/RIGHTS.md)。这些默认资源无需拉取私有素材库。其他独立素材继续遵循以下私有素材约定。
+经维护者确认，本次营地横版 Logo、帐篷双星图标及四张魔王界面插图放在 `packages/frontend/assets/trekker-camp/`，随代码仓库与构建产物分发，通过 `/client-assets/trekker-camp/` 加载。来源与用途见该目录的 [RIGHTS.md](packages/frontend/assets/trekker-camp/RIGHTS.md)。这些默认资源无需拉取私有素材库。其他独立素材继续遵循以下私有素材约定。
 
 ## 目录约定
 
@@ -41,7 +41,7 @@ pnpm dev
 
 `assets:pull` 首次在 `private-assets/` 中初始化独立 Git 仓库，安装该仓库的 LFS hooks 并拉取素材；以后仅快进更新 `master`，下载 `public/` 下的 Git LFS 文件，再建立本地链接。它会拒绝未提交素材、其他开发分支、分叉历史或错误的远程仓库，保留本地工作。登录使用本机已有的 Git 凭据，凭据不写入项目文件。
 
-`apps/misskey/packages/frontend/assets/camp` 链接到素材库的 `public/`；Windows 使用目录联接，无需管理员权限。素材通过 `/client-assets/camp/` 访问。例如 `private-assets/public/home/hero.webp` 对应 `/client-assets/camp/home/hero.webp`。
+`packages/frontend/assets/camp` 链接到素材库的 `public/`；Windows 使用目录联接，无需管理员权限。素材通过 `/client-assets/camp/` 访问。例如 `private-assets/public/home/hero.webp` 对应 `/client-assets/camp/home/hero.webp`。
 
 `pnpm dev` 会自动建立或复用链接，不访问 GitHub，适合离线开发。直接修改素材即可刷新预览，无需重新复制或构建；浏览器缓存命中时强制刷新。需要同步团队更新时显式执行 `pnpm assets:pull`。
 

@@ -10,8 +10,8 @@ import { createHash } from 'node:crypto';
 import { zipSync } from 'fflate';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const source = path.join(root, 'apps/misskey/built/desktop-frontend-staging');
-const destination = path.join(root, 'apps/misskey/built/_desktop_frontend_');
+const source = path.join(root, 'built/desktop-frontend-staging');
+const destination = path.join(root, 'built/_desktop_frontend_');
 const files = {};
 async function collect(directory, prefix = '') {
 	for (const entry of (await fs.readdir(directory, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name, 'en'))) {

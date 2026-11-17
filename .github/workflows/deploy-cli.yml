@@ -25,7 +25,10 @@ on:
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
       - patches/**
-      - apps/misskey/**
+      - packages/**
+      - packages-private/**
+      - locales/**
+      - assets/**
       - .dockerignore
       - .config/docker_example.yml
       - .config/docker_example.env
@@ -54,7 +57,10 @@ on:
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
       - patches/**
-      - apps/misskey/**
+      - packages/**
+      - packages-private/**
+      - locales/**
+      - assets/**
       - .dockerignore
       - .config/docker_example.yml
       - .config/docker_example.env

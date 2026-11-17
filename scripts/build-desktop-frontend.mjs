@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const frontend = path.join(root, 'apps/misskey/packages/frontend');
+const frontend = path.join(root, 'packages/frontend');
 
 async function run(command, args, cwd = root) {
 	await execa(command, args, { cwd, stdio: 'inherit', env: { ...process.env, NODE_ENV: 'production' } });

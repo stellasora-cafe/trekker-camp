@@ -77,7 +77,7 @@ curl() {
             path.write_bytes((ROOT / name).read_bytes())
         for name in ('AGENTS.md', '.git/config', '.config/default.yml',
                      'apps/desktop/client.exe', 'apps/update-service/wrangler.jsonc',
-                     'apps/misskey/packages/backend/test/fixture.ts',
+                     'packages/backend/test/fixture.ts',
                      'private-assets/public/font.woff2', 'node_modules/package/index.js'):
             path = checkout / name
             path.parent.mkdir(parents=True, exist_ok=True)

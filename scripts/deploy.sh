@@ -667,7 +667,9 @@ show_setup_status() {
 	# Only the initialization password is displayed, and only before setup completes.
 	# shellcheck disable=SC2016
 	if ! compose exec -T web node --input-type=module -e '
-import { loadConfig } from "/misskey/apps/misskey/packages/backend/built/config.js";
+import { existsSync } from "node:fs";
+const backend = existsSync("/misskey/packages/backend") ? "/misskey/packages/backend" : "/misskey/apps/misskey/packages/backend";
+const { loadConfig } = await import(backend + "/built/config.js");
 const config = loadConfig();
 const response = await fetch(`http://127.0.0.1:${config.port}/api/meta`, {
 	method: "POST",
@@ -775,7 +777,7 @@ use_image_start_command() (
 
 check_application_runtime() {
 	stage='验证新镜像的 Node 与原生依赖'
-	compose run --rm --no-deps -T --pull never --workdir /misskey/apps/misskey/packages/backend web node --input-type=module <<'JS'
+	compose run --rm --no-deps -T --pull never --workdir /misskey web sh -c 'cd packages/backend 2>/dev/null || cd apps/misskey/packages/backend || exit 1; exec node --input-type=module' <<'JS'
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';

@@ -7,7 +7,7 @@ on:
       - master
       - develop
     paths:
-      - apps/misskey/packages/backend/**
+      - packages/backend/**
       - .github/workflows/get-api-diff.yml
 jobs:
   get-from-misskey:

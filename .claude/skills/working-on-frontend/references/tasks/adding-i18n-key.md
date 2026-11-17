@@ -1,16 +1,16 @@
 # 添加或修改国际化键
 
-添加或修改界面文案时遵循本流程。营地产品文案以 **apps/misskey/locales/zh-CN.yml** 为源语言。
+添加或修改界面文案时遵循本流程。营地产品文案以 **locales/zh-CN.yml** 为源语言。
 
 ## 强制前提
 
-- ja-JP.yml 仅用于上游同步，其他语言 YAML 不手动修改，见 [apps/misskey/locales/README.md](../../../../../apps/misskey/locales/README.md) 和 [crowdin.yml](../../../../../crowdin.yml)。
+- ja-JP.yml 仅用于上游同步，其他语言 YAML 不手动修改，见 [locales/README.md](../../../../../locales/README.md) 和 [crowdin.yml](../../../../../crowdin.yml)。
 - 不在单文件组件中硬编码界面字符串，统一通过 i18n.ts 引用。
 - 重命名已有键时同步迁移调用位置，检查繁体中文回退与上游同步的影响，详见[国际化用法](../knowledge/i18n-usage.md)。
 
 ## 1. 添加键
 
-编辑 [apps/misskey/locales/zh-CN.yml](../../../../../apps/misskey/locales/zh-CN.yml)，保留层级并放在相关章节：
+编辑 [locales/zh-CN.yml](../../../../../locales/zh-CN.yml)，保留层级并放在相关章节：
 
 ```yaml
 # 顶层简单键
@@ -37,7 +37,7 @@ ICU 替代方案、_lang_ 保留键和 Storybook 行为见[国际化用法](../k
 
 ## 2. 重新生成类型
 
-apps/misskey/packages/i18n/build.ts 解析 zh-CN.yml，将接口写入 [apps/misskey/packages/i18n/src/autogen/locale.ts](../../../../../apps/misskey/packages/i18n/src/autogen/locale.ts)。
+packages/i18n/build.ts 解析 zh-CN.yml，将接口写入 [packages/i18n/src/autogen/locale.ts](../../../../../packages/i18n/src/autogen/locale.ts)。
 
 ### 自动生成（推荐）
 
@@ -81,7 +81,7 @@ node scripts/check-locales.mjs
 
 ## 示例：添加删除确认
 
-1. 在 apps/misskey/locales/zh-CN.yml 添加：
+1. 在 locales/zh-CN.yml 添加：
 
    ```yaml
    _notes:
@@ -109,8 +109,8 @@ node scripts/check-locales.mjs
 
 ## 参考
 
-- [语言文件编辑规则](../../../../../apps/misskey/locales/README.md)
-- [zh-CN.yml](../../../../../apps/misskey/locales/zh-CN.yml)
-- [i18n 构建](../../../../../apps/misskey/packages/i18n/build.ts)
-- [生成类型](../../../../../apps/misskey/packages/i18n/src/autogen/locale.ts)
-- [前端 i18n](../../../../../apps/misskey/packages/frontend/src/i18n.ts)
+- [语言文件编辑规则](../../../../../locales/README.md)
+- [zh-CN.yml](../../../../../locales/zh-CN.yml)
+- [i18n 构建](../../../../../packages/i18n/build.ts)
+- [生成类型](../../../../../packages/i18n/src/autogen/locale.ts)
+- [前端 i18n](../../../../../packages/frontend/src/i18n.ts)

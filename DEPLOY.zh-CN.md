@@ -30,7 +30,7 @@ CLI 只接受 `Server deployment artifact` 工作流在 `master` 上成功完成
 
 本次服务端版本保留桌面浏览器授权、设备会话、版本兼容检查与前端资源接口。桌面程序可以在服务端发布后单独进行真实连接测试和发布，无需同步发布安装器。
 
-服务端 PR 合入 `master` 后自动构建，不创建服务端标签或 Release；成功产物才会被 CLI 选中。桌面版本继续使用 `desktop-v*` 标签并发布公开 Release。
+服务端 PR 合入 `master` 后自动构建，不创建服务端标签或 Release；成功产物才会被 CLI 选中。桌面安装器通过[桌面客户端仓库](https://github.com/stellasora-cafe/trekker-camp-desktop/releases)发布。
 
 此前从旧仓库 clone 部署的服务器，先查看 `camp status` 确认现有部署目录，再更新引导脚本及 CLI：
 
@@ -51,7 +51,7 @@ sudo camp status
 2. 下载精简构建产物到部署目录的 `.releases/`；单独拉取私有素材，仅下载 `public/` 下的 LFS 文件。
 3. 从仓库随附的 `.config/docker_example.yml` 和 `.config/docker_example.env` 生成配置，填入域名、随机数据库密码和独立的随机管理员初始化密码 `setupPassword`，保留官方模板的其他默认值与注释；生成 Caddy / Cloudflare DNS 配置，将 `compose.vps.yml` 复制为本站的 `compose.yml`。
 4. 认证并拉取构建清单固定摘要的应用及包含 Cloudflare 插件的 Caddy 镜像，验证代理配置，启动 PostgreSQL 18 和 Redis，备份数据库与配置，运行 `pnpm run init` 初始化数据库。
-5. 挂载素材，以镜像默认的 `node apps/misskey/scripts/start.mjs --migrate` 启动应用，等待容器健康检查和本机 HTTPS `/healthz` 检查成功。
+5. 挂载素材，以镜像默认的 `node scripts/start.mjs --migrate` 启动应用，等待容器健康检查和本机 HTTPS `/healthz` 检查成功。
 
 首次打开站点时，输入 CLI 显示的 **初始化密码**，再自行设置管理员用户名和登录密码。初始化密码在应用启动前生成并写入数据目录的 `.config/default.yml`，使用 24 字节随机数；空白或错误的密码会被拒绝。尚未完成管理员创建时，安装完成输出、`camp status` 和菜单中的“查看站点状态”会显示该密码；管理员创建完成后只显示完成状态。已有部署的配置和管理员账号保持原样，更新与 CLI 自更新不会补写或更换初始化密码。站点创建后保持配置中的 `url` 不变。
 
@@ -87,7 +87,7 @@ bash /tmp/camp-deploy.sh install --url https://camp.example.com --data-dir /srv/
 
 ## 服务端自动构建
 
-每次 PR 合并到 `master` 后，`.github/workflows/server-release.yml` 自动构建 amd64 / arm64 应用与 Caddy 镜像，最后上传 Actions artifact `camp-server`。服务端不需要 tag 或 Release；应用版本为 `0.1.0`，每次部署通过 Actions 构建编号和完整提交号区分。桌面仍独立使用 `desktop-v*` 标签及公开 Release。
+每次 PR 合并到 `master` 后，`.github/workflows/server-release.yml` 自动构建 amd64 / arm64 应用与 Caddy 镜像，最后上传 Actions artifact `camp-server`。服务端不需要 tag 或 Release；应用版本为 `0.1.0`，每次部署通过 Actions 构建编号和完整提交号区分。
 
 `camp-server.tar.gz` 仅含部署 CLI、Compose、示例配置和 `RELEASE.json`。镜像在 `compose.release.yml` 中固定到 digest，不依赖可变标签。对应源码可通过清单中的提交号和应用内源码下载获取。构建产物保留 90 天；若所有成功产物均已过期，可在 `master` 上手动运行该工作流重新生成。
 
