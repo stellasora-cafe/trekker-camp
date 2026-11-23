@@ -14,6 +14,7 @@ import { ClientSessionService } from '@/core/ClientSessionService.js';
 import { CacheService } from '@/core/CacheService.js';
 import { isNativeUserToken } from '@/misc/token.js';
 import { bindThis } from '@/decorators.js';
+import { agentKeyDigest, agentKeyMarker } from './agent-key.js';
 
 export class AuthenticationError extends Error {
 	constructor(message: string) {
@@ -43,11 +44,28 @@ export class AuthenticateService implements OnApplicationShutdown {
 	}
 
 	@bindThis
+	public async authenticateAgent(key: string | null | undefined): Promise<[MiLocalUser, MiAccessToken, undefined]> {
+		if (!key || !/^camp_agent_[A-Za-z0-9_-]{43}$/.test(key)) throw new AuthenticationError('invalid agent key');
+		const token = await this.accessTokensRepository.findOne({
+			where: { token: agentKeyDigest(key) },
+			relations: { user: true },
+		});
+		if (!token?.user || token.user.host !== null || token.user.isSuspended || token.user.isDeleted) {
+			throw new AuthenticationError('inactive agent key');
+		}
+		if (!token.lastUsedAt || token.lastUsedAt.getTime() < Date.now() - 60_000) {
+			await this.accessTokensRepository.update(token.id, { lastUsedAt: new Date() });
+		}
+		return [token.user as MiLocalUser, token, undefined];
+	}
+
+	@bindThis
 	public async authenticate(token: string | null | undefined, protocol?: string, clientApi = false): Promise<[MiLocalUser | null, MiAccessToken | null, string?]> {
 		if (clientApi && protocol !== 'desktop-v1') throw new AuthenticationError('client protocol required');
 		if (token == null) {
 			return [null, null];
 		}
+		if (token.toLowerCase().startsWith(agentKeyMarker) || token.startsWith('camp_agent_')) throw new AuthenticationError('agent key requires agent API');
 
 		if (!clientApi && protocol !== 'web-v1' && protocol !== 'third-party-v1') throw new AuthenticationError('client protocol required');
 		if (token.startsWith('cs_')) {

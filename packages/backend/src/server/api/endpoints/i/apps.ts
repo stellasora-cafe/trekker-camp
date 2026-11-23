@@ -8,6 +8,7 @@ import { Endpoint } from '@/server/api/endpoint-base.js';
 import type { AccessTokensRepository } from '@/models/_.js';
 import { DI } from '@/di-symbols.js';
 import { IdService } from '@/core/IdService.js';
+import { agentKeyMarker } from '../../agent-key.js';
 
 export const meta = {
 	requireCredential: true,
@@ -62,6 +63,7 @@ export const meta = {
 export const paramDef = {
 	type: 'object',
 	properties: {
+		agentOnly: { type: 'boolean', default: false },
 		sort: { type: 'string', enum: ['+createdAt', '-createdAt', '+lastUsedAt', '-lastUsedAt'] },
 	},
 	required: [],
@@ -78,6 +80,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		super(meta, paramDef, async (ps, me) => {
 			const query = this.accessTokensRepository.createQueryBuilder('token')
 				.where('token.userId = :userId', { userId: me.id })
+				.andWhere(ps.agentOnly ? 'token.token LIKE :prefix' : 'token.token NOT LIKE :prefix', { prefix: agentKeyMarker + '%' })
 				.leftJoinAndSelect('token.app', 'app');
 
 			switch (ps.sort) {

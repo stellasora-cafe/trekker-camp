@@ -5,6 +5,7 @@
 
 import { Injectable } from '@nestjs/common';
 import { Endpoint } from '@/server/api/endpoint-base.js';
+import { agentPostIntervalSchema } from '@/models/json-schema/role.js';
 import { GlobalEventService } from '@/core/GlobalEventService.js';
 import { MetaService } from '@/core/MetaService.js';
 import { ModerationLogService } from '@/core/ModerationLogService.js';
@@ -22,6 +23,7 @@ export const paramDef = {
 	properties: {
 		policies: {
 			type: 'object',
+			patternProperties: { '^agentPostIntervalSec$': agentPostIntervalSchema },
 		},
 	},
 	required: [

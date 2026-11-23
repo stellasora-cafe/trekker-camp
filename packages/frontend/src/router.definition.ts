@@ -288,6 +288,10 @@ export const ROUTE_DEF = [{
 	component: page(() => import('@/pages/api-console.vue')),
 	loginRequired: true,
 }, {
+	path: '/platform',
+	name: 'platform',
+	component: page(() => import('@/pages/platform.vue')),
+}, {
 	path: '/scratchpad',
 	component: page(() => import('@/pages/scratchpad.vue')),
 }, {

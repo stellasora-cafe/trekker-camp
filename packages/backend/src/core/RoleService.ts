@@ -62,6 +62,7 @@ export type RolePolicies = {
 	userListLimit: number;
 	userEachUserListsLimit: number;
 	rateLimitFactor: number;
+	agentPostIntervalSec: number;
 	avatarDecorationLimit: number;
 	canImportAntennas: boolean;
 	canImportBlocking: boolean;
@@ -104,6 +105,7 @@ export const DEFAULT_POLICIES: RolePolicies = {
 	userListLimit: 10,
 	userEachUserListsLimit: 50,
 	rateLimitFactor: 1,
+	agentPostIntervalSec: 300,
 	avatarDecorationLimit: 1,
 	canImportAntennas: false,
 	canImportBlocking: false,
@@ -432,6 +434,7 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 			userListLimit: calc('userListLimit', vs => Math.max(...vs)),
 			userEachUserListsLimit: calc('userEachUserListsLimit', vs => Math.max(...vs)),
 			rateLimitFactor: calc('rateLimitFactor', vs => Math.max(...vs)),
+			agentPostIntervalSec: calc('agentPostIntervalSec', vs => Math.min(...vs)),
 			avatarDecorationLimit: calc('avatarDecorationLimit', vs => Math.max(...vs)),
 			canImportAntennas: calc('canImportAntennas', vs => vs.some(v => v === true)),
 			canImportBlocking: calc('canImportBlocking', vs => vs.some(v => v === true)),

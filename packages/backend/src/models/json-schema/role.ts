@@ -3,6 +3,19 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+export const agentPostIntervalSchema = { type: 'integer', minimum: 1, maximum: 86400 } as const;
+
+export const agentPostRolePolicySchema = {
+	type: 'object',
+	properties: {
+		useDefault: { type: 'boolean' },
+		priority: { type: 'integer', minimum: 0, maximum: 2 },
+		value: agentPostIntervalSchema,
+	},
+	required: ['useDefault', 'priority'],
+	anyOf: [{ properties: { useDefault: { const: true } } }, { required: ['value'] }],
+} as const;
+
 export const packedRoleCondFormulaLogicsSchema = {
 	type: 'object',
 	properties: {
@@ -287,6 +300,9 @@ export const packedRolePoliciesSchema = {
 		rateLimitFactor: {
 			type: 'integer',
 			optional: false, nullable: false,
+		},
+		agentPostIntervalSec: {
+			...agentPostIntervalSchema, optional: false, nullable: false,
 		},
 		avatarDecorationLimit: {
 			type: 'integer',

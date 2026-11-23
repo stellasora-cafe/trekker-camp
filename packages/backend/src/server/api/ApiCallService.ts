@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileTypeFromFile } from 'file-type';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as stream from 'node:stream/promises';
@@ -20,6 +23,8 @@ import { TelemetryService } from '@/core/telemetry/TelemetryService.js';
 import type { Config } from '@/config.js';
 import { ApiError, federationDisabled } from './error.js';
 import { RateLimiterService } from './RateLimiterService.js';
+import type { Redis } from 'ioredis';
+import { recordAgentUsage } from './agent-usage.js';
 import { ApiLoggerService } from './ApiLoggerService.js';
 import { AuthenticateService, AuthenticationError } from './AuthenticateService.js';
 import type { Readable } from 'node:stream';
@@ -83,6 +88,9 @@ export class ApiCallService implements OnApplicationShutdown {
 	private userIpHistoriesClearIntervalId: NodeJS.Timeout;
 
 	constructor(
+		@Inject(DI.redis)
+		private redis: Redis,
+
 		@Inject(DI.meta)
 		private meta: MiMeta,
 
@@ -195,11 +203,9 @@ export class ApiCallService implements OnApplicationShutdown {
 		endpoint: IEndpoint & { exec: any },
 		request: FastifyRequest<{ Body: Record<string, unknown> | undefined, Querystring: Record<string, unknown> }>,
 		reply: FastifyReply,
+		body = request.method === 'GET' ? request.query : request.body,
+		agentRequest = false,
 	): Promise<void> {
-		const body = request.method === 'GET'
-			? request.query
-			: request.body;
-
 		// https://datatracker.ietf.org/doc/html/rfc6750.html#section-2.1 (case sensitive)
 		const token = request.headers.authorization?.startsWith('Bearer ')
 			? request.headers.authorization.slice(7)
@@ -209,10 +215,28 @@ export class ApiCallService implements OnApplicationShutdown {
 			return Promise.resolve();
 		}
 
-		return this.telemetryService.startSpan('API: ' + endpoint.name, () => this.authenticateService.authenticate(token, request.headers['x-camp-client'] as string | undefined, request.url.startsWith('/api/client/')).then(([user, app, sessionId]) => {
+		return this.telemetryService.startSpan('API: ' + endpoint.name, () => (agentRequest
+			? this.authenticateService.authenticateAgent(token)
+			: this.authenticateService.authenticate(token, request.headers['x-camp-client'] as string | undefined, request.url.startsWith('/api/client/'))
+		).then(async ([user, app, sessionId]) => {
+			if (agentRequest && user) {
+				const time = Date.now();
+				reply.raw.once('finish', () => {
+					void recordAgentUsage(this.redis, user.id, endpoint.name, reply.statusCode, time)
+						.catch(err => this.logger.warn('Failed to record Agent usage: ' + err.message));
+				});
+				const limit = await this.rateLimiterService.limit({ key: 'agent-v1', max: 60, duration: 60000 }, user.id, 1, true);
+				if (limit) {
+					this.#sendApiError(reply, new ApiError({
+						code: 'RATE_LIMIT_EXCEEDED', message: 'Agent API rate limit exceeded.',
+						id: '6f52792f-1010-413b-83ae-b00f8efa2c42', httpStatusCode: 429,
+					}, limit.info));
+					return;
+				}
+			}
 			delete request.headers['x-camp-session-id'];
 			if (sessionId) request.headers['x-camp-session-id'] = sessionId;
-			const call = this.call(endpoint, user, app, body, null, request).then((res) => {
+			const call = this.call(endpoint, user, app, body, null, request, agentRequest).then((res) => {
 				if (request.method === 'GET' && endpoint.meta.cacheSec && !token && !user) {
 					reply.header('Cache-Control', `public, max-age=${endpoint.meta.cacheSec}`);
 				}
@@ -362,6 +386,7 @@ export class ApiCallService implements OnApplicationShutdown {
 			path: string;
 		} | null,
 		request: FastifyRequest<{ Body: Record<string, unknown> | undefined, Querystring: Record<string, unknown> }>,
+		agentRequest = false,
 	) {
 		const isSecure = user != null && token == null;
 		if (ep.name.startsWith('ap/') || ep.name.startsWith('federation/') ||
@@ -483,6 +508,19 @@ export class ApiCallService implements OnApplicationShutdown {
 			});
 		}
 
+		if (agentRequest && user && ep.name === 'notes/create') {
+			const { agentPostIntervalSec } = await this.roleService.getUserPolicies(user.id);
+			const resetMs = await this.rateLimiterService.reserveAgentPost(user.id, agentPostIntervalSec);
+			if (resetMs !== null) throw new ApiError({
+				code: 'RATE_LIMIT_EXCEEDED', message: 'Agent posting limit exceeded.',
+				id: '31f7e95a-a381-494d-8d16-b6450e5ef604', httpStatusCode: 429,
+			}, { resetMs });
+		}
+
+		if (agentRequest && ep.name === 'drive/files/create') {
+			return this.uploadAgentImage(request, (image) => ep.exec({}, user, token, image, request.ip, {}));
+		}
+
 		// Cast non JSON input
 		if ((ep.meta.requireFile || request.method === 'GET') && ep.params.properties) {
 			for (const k of Object.keys(ep.params.properties)) {
@@ -508,6 +546,44 @@ export class ApiCallService implements OnApplicationShutdown {
 		// authentication, rate limiting, and parameter validation.
 		return await ep.exec(data, user, token, file, request.ip, request.headers)
 			.catch((err: Error) => this.#onExecError(ep, data, err, user?.id));
+	}
+
+	private async uploadAgentImage(request: FastifyRequest, save: (file: { name: string; path: string }) => Promise<unknown>) {
+		const invalid = new ApiError({
+			code: 'INVALID_MEDIA', message: 'Send one PNG, JPEG, GIF or WebP image in the file field.',
+			id: '73c59369-7e21-4ccd-a602-a398b947cdd8',
+		});
+		if (!request.isMultipart()) throw invalid;
+		const directory = await fs.promises.mkdtemp(join(tmpdir(), 'camp-agent-'));
+		const path = join(directory, 'image');
+		try {
+			let name: string | undefined;
+			try {
+				for await (const part of request.parts({ limits: { fields: 0, files: 1, parts: 2 } })) {
+					if (part.type !== 'file' || part.fieldname !== 'file' || !part.filename || name) throw invalid;
+					name = part.filename;
+					const failure = await writeMultipartFileToTemp(part.file, path);
+					if (part.file.truncated) throw new ApiError({
+						code: 'MAX_FILE_SIZE_EXCEEDED', message: 'Image exceeds the upload size limit.',
+						id: 'afb23d60-10f1-4586-b165-56d18326ede9', httpStatusCode: 413,
+					});
+					if (failure) throw invalid;
+				}
+			} catch (err) {
+				if (err instanceof ApiError) throw err;
+				if (err instanceof Error && 'code' in err && typeof err.code === 'string' && !err.code.startsWith('FST_')) throw err;
+				throw invalid;
+			}
+			if (!name) throw invalid;
+			const type = await fileTypeFromFile(path).catch((err: Error) => {
+				if (err.name === 'EndOfStreamError') return undefined;
+				throw err;
+			});
+			if (!type || !['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(type.mime)) throw invalid;
+			return await save({ name, path });
+		} finally {
+			await fs.promises.rm(directory, { recursive: true, force: true });
+		}
 	}
 
 	@bindThis

@@ -587,6 +587,9 @@ import type {
 	PagesUpdateRequest,
 	PingResponse,
 	PinnedUsersResponse,
+	PlatformCreateKeyRequest,
+	PlatformCreateKeyResponse,
+	PlatformUsageResponse,
 	PromoReadRequest,
 	RenoteMuteCreateRequest,
 	RenoteMuteDeleteRequest,
@@ -1078,6 +1081,8 @@ export type Endpoints = {
 	'pages/update': { req: PagesUpdateRequest; res: EmptyResponse };
 	'ping': { req: EmptyRequest; res: PingResponse };
 	'pinned-users': { req: EmptyRequest; res: PinnedUsersResponse };
+	'platform/create-key': { req: PlatformCreateKeyRequest; res: PlatformCreateKeyResponse };
+	'platform/usage': { req: EmptyRequest; res: PlatformUsageResponse };
 	'promo/read': { req: PromoReadRequest; res: EmptyResponse };
 	'renote-mute/create': { req: RenoteMuteCreateRequest; res: EmptyResponse };
 	'renote-mute/delete': { req: RenoteMuteDeleteRequest; res: EmptyResponse };

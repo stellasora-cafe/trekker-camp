@@ -3568,6 +3568,26 @@ export type paths = {
          */
         post: operations['pinned-users'];
     };
+    '/platform/create-key': {
+        /**
+         * platform/create-key
+         * @description No description provided.
+         *
+         *     **Internal Endpoint**: This endpoint is an API for the misskey mainframe and is not intended for use by third parties.
+         *     **Credential required**: *Yes*
+         */
+        post: operations['platform___create-key'];
+    };
+    '/platform/usage': {
+        /**
+         * platform/usage
+         * @description No description provided.
+         *
+         *     **Internal Endpoint**: This endpoint is an API for the misskey mainframe and is not intended for use by third parties.
+         *     **Credential required**: *Yes*
+         */
+        post: operations['platform___usage'];
+    };
     '/promo/read': {
         /**
          * promo/read
@@ -5509,6 +5529,7 @@ export type components = {
             userListLimit: number;
             userEachUserListsLimit: number;
             rateLimitFactor: number;
+            agentPostIntervalSec: number;
             avatarDecorationLimit: number;
             canImportAntennas: boolean;
             canImportBlocking: boolean;
@@ -11197,7 +11218,16 @@ export interface operations {
                     preserveAssignmentOnMoveAccount?: boolean;
                     canEditMembersByModerator: boolean;
                     displayOrder: number;
-                    policies: Record<string, never>;
+                    policies: {
+                        [key: string]: {
+                            useDefault: boolean;
+                            priority: number;
+                            value?: number;
+                        } | {
+                            /** @constant */
+                            useDefault?: true;
+                        } | unknown;
+                    };
                 };
             };
         };
@@ -11531,7 +11561,16 @@ export interface operations {
                     preserveAssignmentOnMoveAccount?: boolean;
                     canEditMembersByModerator?: boolean;
                     displayOrder?: number;
-                    policies?: Record<string, never>;
+                    policies?: {
+                        [key: string]: {
+                            useDefault: boolean;
+                            priority: number;
+                            value?: number;
+                        } | {
+                            /** @constant */
+                            useDefault?: true;
+                        } | unknown;
+                    };
                 };
             };
         };
@@ -11593,7 +11632,9 @@ export interface operations {
         requestBody: {
             content: {
                 'application/json': {
-                    policies: Record<string, never>;
+                    policies: {
+                        [key: string]: number;
+                    };
                 };
             };
         };
@@ -25931,6 +25972,8 @@ export interface operations {
         requestBody: {
             content: {
                 'application/json': {
+                    /** @default false */
+                    agentOnly?: boolean;
                     /** @enum {string} */
                     sort?: '+createdAt' | '-createdAt' | '+lastUsedAt' | '-lastUsedAt';
                 };
@@ -34046,6 +34089,148 @@ export interface operations {
                 };
                 content: {
                     'application/json': components['schemas']['UserDetailed'][];
+                };
+            };
+            /** @description Client error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Authentication error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Forbidden error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description I'm Ai */
+            418: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+        };
+    };
+    'platform___create-key': {
+        requestBody: {
+            content: {
+                'application/json': {
+                    name: string;
+                    /** @default false */
+                    allowWrites?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description OK (with results) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': {
+                        id: string;
+                        key: string;
+                    };
+                };
+            };
+            /** @description Client error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Authentication error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Forbidden error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description I'm Ai */
+            418: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+        };
+    };
+    platform___usage: {
+        responses: {
+            /** @description OK (with results) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': {
+                        date: string;
+                        requests: number;
+                        posts: number;
+                        limited: number;
+                    }[];
                 };
             };
             /** @description Client error */

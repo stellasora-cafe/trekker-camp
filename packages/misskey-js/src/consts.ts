@@ -221,6 +221,7 @@ export const rolePolicies = [
 	'userListLimit',
 	'userEachUserListsLimit',
 	'rateLimitFactor',
+	'agentPostIntervalSec',
 	'avatarDecorationLimit',
 	'canImportAntennas',
 	'canImportBlocking',

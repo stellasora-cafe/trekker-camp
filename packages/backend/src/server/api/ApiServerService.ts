@@ -18,6 +18,7 @@ import { RateLimiterService } from './RateLimiterService.js';
 import { bindThis } from '@/decorators.js';
 import { desktopUpdateRequired } from '../desktop-compatibility.js';
 import endpoints from './endpoints.js';
+import { registerDeveloperApi } from './developer-api.js';
 import { ApiCallService } from './ApiCallService.js';
 import { SignupApiService } from './SignupApiService.js';
 import { clientSessionErrors } from './client-session-errors.js';
@@ -87,13 +88,20 @@ export class ApiServerService {
 
 		type ApiRequest = { Body: Record<string, unknown>; Querystring: Record<string, unknown> };
 		const handlers = new Map<string, (request: FastifyRequest<ApiRequest>, reply: FastifyReply) => Promise<FastifyReply>>();
-		for (const endpoint of endpoints) {
-			const ep = {
+		const resolvedEndpoints = new Map(endpoints.map(endpoint => {
+			return [endpoint.name, {
 				name: endpoint.name,
 				meta: endpoint.meta,
 				params: endpoint.params,
 				exec: this.moduleRef.get('ep:' + endpoint.name, { strict: false }).exec,
-			};
+			}] as const;
+		}));
+		registerDeveloperApi(fastify, name => {
+			const ep = resolvedEndpoints.get(name);
+			if (!ep) throw new Error('Unknown developer API endpoint: ' + name);
+			return (request, reply, params) => this.apiCallService.handleRequest(ep, request, reply, params, true);
+		});
+		for (const ep of resolvedEndpoints.values()) {
 			const handler = async (request: FastifyRequest<ApiRequest>, reply: FastifyReply) => {
 				if (request.method === 'GET' && !ep.meta.allowGet) return reply.code(405).send();
 				if (ep.meta.requireFile) {

@@ -13,7 +13,7 @@ const primaryPages = new Set([
 ]);
 
 export function usesMinimumShell(fullPath: string): boolean {
-	return /^\/(share|auth|client-auth|miauth|oauth|signup-complete|verify-email|install-extensions)(?:\/|\?|#|$)/.test(fullPath);
+	return /^\/(platform|share|auth|client-auth|miauth|oauth|signup-complete|verify-email|install-extensions)(?:\/|\?|#|$)/.test(fullPath);
 }
 
 /** A direct detail link has a real parent, without inventing intermediate URLs. */
@@ -60,6 +60,9 @@ export function bindPageHistory<Routes extends RouteDef[]>(router: Nirax<Routes>
 	};
 	const sameDocument = (a: string, b: string) => a.split('#', 1)[0] === b.split('#', 1)[0];
 	const minimumShell = usesMinimumShell(currentPath());
+	const isPlatform = (path: string) => /^\/platform\/?(?:[?#]|$)/.test(path);
+	const platformShell = isPlatform(currentPath());
+	const switchesPlatform = (path: string) => platformShell !== isPlatform(path);
 	let lastPath = currentPath();
 	let traversing = false;
 	const read = (path: string): PageHistory | null => {
@@ -76,11 +79,15 @@ export function bindPageHistory<Routes extends RouteDef[]>(router: Nirax<Routes>
 		lastPath = path;
 	};
 	const replace = (path: string) => {
-		if (minimumShell && !usesMinimumShell(path)) browser.location.replace(path);
+		if (switchesPlatform(path) || (minimumShell && !usesMinimumShell(path))) browser.location.replace(path);
 		else router.replaceByPath(path);
 	};
 	const onPush = ({ fullPath }: { fullPath: string }) => {
 		const path = canonical(fullPath);
+		if (switchesPlatform(path)) {
+			browser.location.assign(path);
+			return;
+		}
 		const before = currentPath();
 		// A redirect can resolve back to the current page after Nirax's
 		// initial same-path check. It must not add a duplicate back step.
@@ -88,12 +95,16 @@ export function bindPageHistory<Routes extends RouteDef[]>(router: Nirax<Routes>
 		else write('pushState', path, before);
 	};
 	const onReplace = ({ fullPath }: { fullPath: string }) => {
+		if (switchesPlatform(fullPath)) {
+			browser.location.replace(fullPath);
+			return;
+		}
 		write('replaceState', canonical(fullPath), read(currentPath())?.previous ?? null);
 	};
 	const onPopState = () => {
 		traversing = false;
 		const path = currentPath();
-		if (minimumShell && !usesMinimumShell(path)) {
+		if (switchesPlatform(path) || (minimumShell && !usesMinimumShell(path))) {
 			browser.location.replace(path);
 			return;
 		}

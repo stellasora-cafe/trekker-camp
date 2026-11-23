@@ -36,6 +36,7 @@ function createService() {
 		{} as never,
 		{} as never,
 		{} as never,
+		{} as never,
 		authenticateService as never,
 		{} as never,
 		{} as never,

@@ -8629,6 +8629,14 @@ export interface Locale extends ILocale {
              */
             "rateLimitFactor": string;
             /**
+             * Agent 发帖间隔（秒）
+             */
+            "agentPostIntervalSec": string;
+            /**
+             * 同一账号的所有 Agent 共用间隔，范围为 1 至 86400 秒。包括原创、回复、引用和转发。
+             */
+            "agentPostIntervalDescription": string;
+            /**
              * 值越小限制越少，值越大限制越多。
              */
             "descriptionOfRateLimitFactor": string;
@@ -14487,5 +14495,207 @@ export interface Locale extends ILocale {
          * 正在重新连接…
          */
         "waiting": string;
+    };
+    "_agentPlatform": {
+        /**
+         * 首页
+         */
+        "home": string;
+        /**
+         * 用量分析
+         */
+        "analytics": string;
+        /**
+         * 逐日明细
+         */
+        "daily": string;
+        /**
+         * 日期
+         */
+        "day": string;
+        /**
+         * 今天
+         */
+        "today": string;
+        /**
+         * 接入资源
+         */
+        "connections": string;
+        /**
+         * 快速开始
+         */
+        "quickstart": string;
+        /**
+         * 营地 Agent API
+         */
+        "apiTitle": string;
+        /**
+         * 用营地账号连接你的 Agent，读取社区动态、发布帖子并管理互动。
+         */
+        "heroText": string;
+        /**
+         * 管理 Agent 的访问权限
+         */
+        "keyHint": string;
+        /**
+         * 请求示例与接口参考
+         */
+        "docsHint": string;
+        /**
+         * 查看调用与限流记录
+         */
+        "usageHint": string;
+        /**
+         * 控制台概览
+         */
+        "overview": string;
+        /**
+         * 工作空间
+         */
+        "workspace": string;
+        /**
+         * 调用趋势
+         */
+        "activity": string;
+        /**
+         * 近 7 天
+         */
+        "week": string;
+        /**
+         * API 调用
+         */
+        "requests": string;
+        /**
+         * 成功发帖
+         */
+        "posts": string;
+        /**
+         * 限流响应
+         */
+        "limited": string;
+        /**
+         * 有效密钥
+         */
+        "activeKeys": string;
+        /**
+         * 按北京时间自然日统计
+         */
+        "since": string;
+        /**
+         * 账号配额
+         */
+        "quotas": string;
+        /**
+         * 每分钟请求上限
+         */
+        "requestQuota": string;
+        /**
+         * 发帖最短间隔
+         */
+        "postQuota": string;
+        /**
+         * {n} 秒
+         */
+        "seconds": ParameterizedString<"n">;
+        /**
+         * 密钥管理
+         */
+        "keyManager": string;
+        /**
+         * 接入文档
+         */
+        "docs": string;
+        /**
+         * 返回旅人营地
+         */
+        "returnCamp": string;
+        /**
+         * 尚未调用
+         */
+        "neverUsed": string;
+        /**
+         * 查看全部
+         */
+        "viewAll": string;
+        /**
+         * 最近创建的密钥
+         */
+        "recentKeys": string;
+        /**
+         * 使用 Agent 密钥读取账号资料、发布帖子并处理限流响应。
+         */
+        "guideHelp": string;
+        /**
+         * 创建密钥后，可在这里查看权限与最近调用时间。
+         */
+        "firstKey": string;
+        /**
+         * 欢迎，魔王大人。登录后即可管理 Agent 密钥，查看调用用量。
+         */
+        "guest": string;
+        /**
+         * 使用营地账号登录
+         */
+        "signIn": string;
+        /**
+         * 还没有营地账号？
+         */
+        "newAccount": string;
+        /**
+         * 下载 Agent API 接入指南
+         */
+        "guide": string;
+        /**
+         * 营地开放平台
+         */
+        "title": string;
+        /**
+         * 我的 Agent 密钥
+         */
+        "keys": string;
+        /**
+         * 每个营地账号的 Agent 共用每分钟 60 次调用额度。按你的角色设置，每次发帖需间隔 {seconds} 秒，回复、引用和转发也计入。
+         */
+        "intro": ParameterizedString<"seconds">;
+        /**
+         * Agent 名称
+         */
+        "name": string;
+        /**
+         * 允许上传图片、发帖、删除帖子、回应、收藏和关注
+         */
+        "write": string;
+        /**
+         * 创建密钥
+         */
+        "create": string;
+        /**
+         * 新密钥仅显示一次，请复制并保存在 Agent 宿主中
+         */
+        "secret": string;
+        /**
+         * 只读
+         */
+        "readOnly": string;
+        /**
+         * 读写
+         */
+        "readWrite": string;
+        /**
+         * 还没有 Agent 密钥
+         */
+        "empty": string;
+        /**
+         * 读取当前账号
+         */
+        "example": string;
+        /**
+         * 撤销密钥
+         */
+        "revoke": string;
+        /**
+         * 撤销后，使用此密钥的 Agent 将立即失去访问权限。
+         */
+        "confirm": string;
     };
 }

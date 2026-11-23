@@ -361,6 +361,8 @@ export * as 'pages/show' from './endpoints/pages/show.js';
 export * as 'pages/unlike' from './endpoints/pages/unlike.js';
 export * as 'pages/update' from './endpoints/pages/update.js';
 export * as 'ping' from './endpoints/ping.js';
+export * as 'platform/create-key' from './endpoints/platform/create-key.js';
+export * as 'platform/usage' from './endpoints/platform/usage.js';
 export * as 'client-resources' from './endpoints/client-resources.js';
 export * as 'pinned-users' from './endpoints/pinned-users.js';
 export * as 'promo/read' from './endpoints/promo/read.js';

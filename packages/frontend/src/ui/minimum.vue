@@ -6,7 +6,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <template>
 <div :class="$style.root">
 	<div v-if="customChrome && isClientAuthorization" class="_campWindowHeader" data-camp-window-drag></div>
-	<XEmailVerificationBanner v-if="!isClientAuthorization"/>
+	<XEmailVerificationBanner v-if="!isClientAuthorization && mainRouter.currentRoute.value.name !== 'platform'"/>
 	<RouterView/>
 
 	<XCommon/>

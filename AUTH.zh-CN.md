@@ -20,6 +20,8 @@
 
 客户端使用 `Authorization: Bearer <设备会话>`。第三方继续使用原有 OAuth／MiAuth 权限范围与授权管理，同时须发送第三方协议请求头；OAuth 令牌兑换同样需要该请求头。未声明协议的普通 Misskey 客户端授权请求会被拒绝。匿名公开读取保持开放，请求头本身不授予账号权限。第三方凭证与设备会话分别验证，不能混用入口。
 
+Agent 使用开放平台签发的专用密钥和 `X-Camp-Client: agent-v1` 调用 `/api/agent/v1`。接入流程、账号限额及接口清单见[营地开放平台指南](DEVELOPER-API.zh-CN.md)。
+
 ### 桌面版本握手
 
 客户端首次启动和检查前端更新时，请求 `GET /_desktop/frontend/manifest.json`，并发送：

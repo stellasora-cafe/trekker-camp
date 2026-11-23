@@ -17,6 +17,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<div class="_gaps_m">
 					<MkButton primary @click="generateToken">{{ i18n.ts.generateAccessToken }}</MkButton>
 					<FormLink to="/settings/apps">{{ i18n.ts.manageAccessTokens }}</FormLink>
+					<FormLink to="/platform" external>{{ i18n.ts._agentPlatform.title }}</FormLink>
 					<FormLink to="/api-console" :behavior="isDesktop ? 'window' : null">API console</FormLink>
 				</div>
 			</FormSection>

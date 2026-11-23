@@ -15,6 +15,16 @@ SPDX-License-Identifier: AGPL-3.0-only
 			</template>
 		</XFolder>
 
+		<XFolder v-if="matchQuery([i18n.ts._role._options.agentPostIntervalSec, 'agentPostIntervalSec'])" v-model:policyMeta="policyMetaModel.agentPostIntervalSec" :isBaseRole="isBaseRole" :readonly="readonly">
+			<template #label>{{ i18n.ts._role._options.agentPostIntervalSec }}</template>
+			<template #valueText>{{ valuesModel.agentPostIntervalSec }}</template>
+			<template #default="{ disabled }">
+				<MkInput v-model="valuesModel.agentPostIntervalSec" type="number" :disabled="disabled" :min="1" :max="86400">
+					<template #caption>{{ i18n.ts._role._options.agentPostIntervalDescription }}</template>
+				</MkInput>
+			</template>
+		</XFolder>
+
 		<XFolder v-if="matchQuery([i18n.ts._role._options.ltlAvailable, 'ltlAvailable'])" v-model:policyMeta="policyMetaModel.ltlAvailable" :isBaseRole="isBaseRole" :readonly="readonly">
 			<template #label>{{ i18n.ts._role._options.ltlAvailable }}</template>
 			<template #valueText>{{ valuesModel.ltlAvailable ? i18n.ts.yes : i18n.ts.no }}</template>

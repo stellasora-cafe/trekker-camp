@@ -10,6 +10,7 @@ import { DI } from '@/di-symbols.js';
 import type Logger from '@/logger.js';
 import { LoggerService } from '@/core/LoggerService.js';
 import { bindThis } from '@/decorators.js';
+import { agentPostIntervalSchema } from '@/models/json-schema/role.js';
 import type { IEndpointMeta } from './endpoints.js';
 
 type RateLimitInfo = {
@@ -51,8 +52,21 @@ export class RateLimiterService {
 	}
 
 	@bindThis
-	public async limit(limitation: IEndpointMeta['limit'] & { key: NonNullable<string> }, actor: string, factor = 1): Promise<RateLimitInfo | null> {
-		if (this.disabled) {
+	public async reserveAgentPost(userId: string, intervalSec: number): Promise<number | null> {
+		// Retain the last submission for the longest configurable interval so a role change applies to the next request.
+		const remaining = Number(await this.redisClient.eval(`
+			local ttl = redis.call('PTTL', KEYS[1])
+			local wait = tonumber(ARGV[1]) - (tonumber(ARGV[2]) - ttl)
+			if ttl > 0 and wait > 0 then return wait end
+			redis.call('SET', KEYS[1], '1', 'PX', ARGV[2])
+			return 0
+		`, 1, 'limit:agent-last-post:' + userId, intervalSec * 1000, agentPostIntervalSchema.maximum * 1000));
+		return remaining > 0 ? Date.now() + remaining : null;
+	}
+
+	@bindThis
+	public async limit(limitation: IEndpointMeta['limit'] & { key: NonNullable<string> }, actor: string, factor = 1, alwaysEnforce = false): Promise<RateLimitInfo | null> {
+		if (this.disabled && !alwaysEnforce) {
 			return null;
 		}
 

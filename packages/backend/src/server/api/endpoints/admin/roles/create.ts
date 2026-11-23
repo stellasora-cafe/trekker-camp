@@ -5,6 +5,7 @@
 
 import { Inject, Injectable } from '@nestjs/common';
 import { Endpoint } from '@/server/api/endpoint-base.js';
+import { agentPostRolePolicySchema } from '@/models/json-schema/role.js';
 import { RoleEntityService } from '@/core/entities/RoleEntityService.js';
 import { RoleService } from '@/core/RoleService.js';
 
@@ -41,6 +42,7 @@ export const paramDef = {
 		displayOrder: { type: 'number' },
 		policies: {
 			type: 'object',
+			patternProperties: { '^agentPostIntervalSec$': agentPostRolePolicySchema },
 		},
 	},
 	required: [
