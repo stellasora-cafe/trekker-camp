@@ -141,7 +141,7 @@ jobs:
       - name: Install test tools
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends ca-certificates git git-lfs openssl python3 shellcheck
+          apt-get install -y --no-install-recommends ca-certificates git openssl python3 shellcheck
       - uses: actions/checkout@v7.0.1
       - name: Verify Docker installation from the Ubuntu APT source
         shell: bash

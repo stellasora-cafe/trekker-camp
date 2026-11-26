@@ -32,14 +32,14 @@ private-assets/
 
 ## 本地开发
 
-团队成员安装 Git LFS 并取得素材仓库访问权限后，在代码仓库根目录执行：
+团队成员取得素材仓库访问权限后，在代码仓库根目录执行：
 
 ```bash
 pnpm assets:pull
 pnpm dev
 ```
 
-`assets:pull` 首次在 `private-assets/` 中初始化独立 Git 仓库，安装该仓库的 LFS hooks 并拉取素材；以后仅快进更新 `master`，下载 `public/` 下的 Git LFS 文件，再建立本地链接。它会拒绝未提交素材、其他开发分支、分叉历史或错误的远程仓库，保留本地工作。登录使用本机已有的 Git 凭据，凭据不写入项目文件。
+`assets:pull` 首次在 `private-assets/` 中初始化独立 Git 仓库并拉取素材，之后仅快进更新 `master`。同步成功后建立本地链接。它会拒绝未提交素材、其他开发分支、分叉历史或错误的远程仓库，保留本地工作。登录使用本机已有的 Git 凭据，凭据不写入项目文件。
 
 `packages/frontend/assets/camp` 链接到素材库的 `public/`；Windows 使用目录联接，无需管理员权限。素材通过 `/client-assets/camp/` 访问。例如 `private-assets/public/home/hero.webp` 对应 `/client-assets/camp/home/hero.webp`。
 
@@ -51,7 +51,7 @@ pnpm dev
 
 在 `private-assets/` 中创建素材分支，添加网站资源并更新 `RIGHTS.md`，验证后向私有素材库创建 PR。程序对素材 URL 的引用在主代码仓库单独提交。主仓库的 `git add` 不会加入素材仓库。
 
-音频、视频和原稿的 LFS 规则已在私有仓库配置；新增大图片时可按需要扩展其 `.gitattributes`。具体协作和发布步骤见[私有素材仓库指南](https://github.com/stellasora-cafe/trekker-camp-assets#readme)。
+图片、音频、视频和原稿均按普通 Git 文件管理。具体协作和发布步骤见[私有素材仓库指南](https://github.com/stellasora-cafe/trekker-camp-assets#readme)。
 
 ### 多个 worktree 共用素材
 

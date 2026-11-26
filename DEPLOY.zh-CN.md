@@ -1,6 +1,6 @@
 # 旅人营地 VPS 部署
 
-`scripts/deploy.sh` 为本站准备 Linux VPS、按 master 最新成功构建部署应用并同步私有素材。支持 **Ubuntu 22.04、24.04、26.04 LTS**，CPU 架构为 **amd64 / arm64**。宿主机使用 Bash、Python 3、Git、Git LFS 和 Docker，Node 与 pnpm 在镜像中安装。
+`scripts/deploy.sh` 为本站准备 Linux VPS、按 master 最新成功构建部署应用并同步私有素材。支持 **Ubuntu 22.04、24.04、26.04 LTS**，CPU 架构为 **amd64 / arm64**。宿主机使用 Bash、Python 3、Git 和 Docker，Node 与 pnpm 在镜像中安装。
 
 ## 首次部署
 
@@ -47,8 +47,8 @@ sudo camp status
 
 安装自动完成：
 
-1. 检测 Ubuntu 版本，安装缺少的 Git / Git LFS 等工具；没有 Docker 时通过官方 APT 源安装 Docker Engine、Compose 和 Buildx。版本对应 `jammy` / `noble` / `resolute`，依据 [Docker Ubuntu 安装文档](https://docs.docker.com/engine/install/ubuntu/)。已有可用 Docker 会被复用。
-2. 下载精简构建产物到部署目录的 `.releases/`；单独拉取私有素材，仅下载 `public/` 下的 LFS 文件。
+1. 检测 Ubuntu 版本，安装缺少的 Git 等工具；没有 Docker 时通过官方 APT 源安装 Docker Engine、Compose 和 Buildx。版本对应 `jammy` / `noble` / `resolute`，依据 [Docker Ubuntu 安装文档](https://docs.docker.com/engine/install/ubuntu/)。已有可用 Docker 会被复用。
+2. 下载精简构建产物到部署目录的 `.releases/`；单独拉取私有素材仓库，部署时只挂载 `public/`。
 3. 从仓库随附的 `.config/docker_example.yml` 和 `.config/docker_example.env` 生成配置，填入域名、随机数据库密码和独立的随机管理员初始化密码 `setupPassword`，保留官方模板的其他默认值与注释；生成 Caddy / Cloudflare DNS 配置，将 `compose.vps.yml` 复制为本站的 `compose.yml`。
 4. 认证并拉取构建清单固定摘要的应用及包含 Cloudflare 插件的 Caddy 镜像，验证代理配置，启动 PostgreSQL 18 和 Redis，备份数据库与配置，运行 `pnpm run init` 初始化数据库。
 5. 挂载素材，以镜像默认的 `node scripts/start.mjs --migrate` 启动应用，等待容器健康检查和本机 HTTPS `/healthz` 检查成功。
@@ -180,7 +180,7 @@ CLI 成套安装到 `/usr/local/lib/trekker-camp/<提交号>-<随机后缀>/`，
 
 GitHub 认证依次使用 `GH_TOKEN`、`GITHUB_TOKEN`、数据目录的 `.config/github-token`，都没有时在终端隐藏询问。使用选中主仓库和素材仓库、权限为 **Actions: Read-only** 与 **Contents: Read-only** 的细粒度 PAT（`github_pat_` 开头）。CLI 不读取 `gh` 登录状态。
 
-首次安装或更新成功读取私有素材及 LFS 文件后，CLI 自动保存本次 PAT。重开终端、服务器重启和 `camp self-update` 后继续使用该文件。PAT 以明文存放在宿主机的独立文件中，仅 root 可读写；与站点配置一起纳入本地配置备份和 R2 加密备份。
+首次安装或更新成功同步私有素材后，CLI 自动保存本次 PAT。重开终端、服务器重启和 `camp self-update` 后继续使用该文件。PAT 以明文存放在宿主机的独立文件中，仅 root 可读写；与站点配置一起纳入本地配置备份和 R2 加密备份。
 
 更换 PAT 或首次无人值守部署时，可从终端或部署系统注入新值。新值优先于已保存的 PAT，访问素材成功后替换旧文件，认证失败时保留原文件：
 
@@ -192,7 +192,7 @@ sudo --preserve-env=GH_TOKEN camp update
 unset GH_TOKEN
 ```
 
-也可由部署系统的 Secret 环境变量提供 `GH_TOKEN`。CLI 通过临时 `GIT_ASKPASS` 向 Git / Git LFS 提供凭据，PAT 不写入仓库 URL、Git 配置、日志或镜像，临时 helper 不含 PAT，运行结束后删除。`status`、`logs`、启停及自启管理不需要 GitHub PAT。
+也可由部署系统的 Secret 环境变量提供 `GH_TOKEN`。CLI 通过临时 `GIT_ASKPASS` 向 Git 提供凭据，PAT 不写入仓库 URL、Git 配置、日志或镜像，临时 helper 不含 PAT，运行结束后删除。`status`、`logs`、启停及自启管理不需要 GitHub PAT。
 
 私有镜像认证依次读取 `GHCR_TOKEN`、数据目录 `.config/ghcr-token`，缺失时隐藏询问 classic PAT（`read:packages`）。CLI 获取令牌对应用户名，通过标准输入登录 GHCR；Docker 凭据只保存在临时目录，操作结束即清除。两个镜像均拉取成功后才保存令牌，权限 root `0600`，失败保留旧令牌。无人值守安装/更新需同时保留 `GH_TOKEN,GHCR_TOKEN` 环境变量。
 
@@ -284,9 +284,9 @@ pnpm assets:test
 
 CLI 专项可在 Linux / WSL 中单独运行 `bash scripts/check-deploy.sh`。真实加密恢复检查使用 `RESTIC_TEST_IMAGE=restic/restic:0.19.1 python3 scripts/backup.test.py BackupTests.test_real_restic_encrypted_incremental_backup_and_restore -v`，需要可用 Docker daemon。
 
-部署相关文件发生改动时，`node scripts/check-shipping.mjs` 自动调用同一检查入口；Windows 使用默认 WSL 发行版。需在 Linux 环境安装 Bash、Python 3、Git、Git LFS 和 ShellCheck，Compose 检查需要 Docker CLI。Agent 依照 `AGENTS.md` 与交付技能使用实际数据路径，获得生产部署授权后通过 `camp update` 发布。
+部署相关文件发生改动时，`node scripts/check-shipping.mjs` 自动调用同一检查入口；Windows 使用默认 WSL 发行版。需在 Linux 环境安装 Bash、Python 3、Git 和 ShellCheck，Compose 检查需要 Docker CLI。Agent 依照 `AGENTS.md` 与交付技能使用实际数据路径，获得生产部署授权后通过 `camp update` 发布。
 
-`.github/workflows/deploy-cli.yml` 支持 PR、`master` 推送和手动触发，在 Ubuntu 22.04、24.04、26.04 容器中实际安装 Docker 官方 APT 软件包。检查覆盖终端菜单键盘操作、安装向导、普通用户提权、日志中断、失败后返回菜单、CLI 成套自更新、下载失败保留旧命令、自定义数据目录、旧安装路径、Git / LFS、Compose，以及备份 / 迁移 / 健康检查失败处理。运行时检查构建应用镜像，验证 Node / pnpm 版本错配、pnpm 调用其他 Node、原生模块加载失败的拒绝行为，并用 Node 24 旧容器验证升级至当前镜像时保留上传文件、预检失败保留旧容器。R2 流程测试覆盖停站恢复、上传失败、凭据保存和北京时间调度，并使用真实 Restic 镜像离线验证加密、增量备份和恢复。另行构建 Caddy 镜像，在禁用网络的容器中验证 Cloudflare DNS 和访客 IP 配置。结果汇总到 `VPS CLI checks`。测试使用临时仓库和隔离容器；实际 R2 连接在 VPS 绑定时验证。
+`.github/workflows/deploy-cli.yml` 支持 PR、`master` 推送和手动触发，在 Ubuntu 22.04、24.04、26.04 容器中实际安装 Docker 官方 APT 软件包。检查覆盖终端菜单键盘操作、安装向导、普通用户提权、日志中断、失败后返回菜单、CLI 成套自更新、下载失败保留旧命令、自定义数据目录、旧安装路径、私有素材同步、Compose，以及备份 / 迁移 / 健康检查失败处理。运行时检查构建应用镜像，验证 Node / pnpm 版本错配、pnpm 调用其他 Node、原生模块加载失败的拒绝行为，并用 Node 24 旧容器验证升级至当前镜像时保留上传文件、预检失败保留旧容器。R2 流程测试覆盖停站恢复、上传失败、凭据保存和北京时间调度，并使用真实 Restic 镜像离线验证加密、增量备份和恢复。另行构建 Caddy 镜像，在禁用网络的容器中验证 Cloudflare DNS 和访客 IP 配置。结果汇总到 `VPS CLI checks`。测试使用临时仓库和隔离容器；实际 R2 连接在 VPS 绑定时验证。
 
 
 

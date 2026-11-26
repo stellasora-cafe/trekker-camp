@@ -32,7 +32,7 @@ node scripts/check-shipping.mjs
 脚本完成以下独立检查，并以退出码 0（通过）、1（违规）、2（检查无法执行）汇总结果：
 
 - 以 NUL 分隔安全枚举已提交、未提交和未跟踪的改动，仅对改动文件从所属包根目录运行 `eslint --quiet`。
-- 部署脚本、Compose、Caddy 或部署 CI 改动时，执行与 CI 共用的 `bash scripts/check-deploy.sh`；Windows 自动通过默认 WSL 发行版执行，需在该环境提供 Bash、Python 3、Git LFS 和 ShellCheck。工具缺失会报告检查错误。
+- 部署脚本、Compose、Caddy 或部署 CI 改动时，执行与 CI 共用的 `bash scripts/check-deploy.sh`；Windows 自动通过默认 WSL 发行版执行，需在该环境提供 Bash、Python 3、Git 和 ShellCheck。工具缺失会报告检查错误。
 - SPDX 检查失败时，仅对本地改动中缺失的头运行 `check-spdx.mjs --fix`，然后重新执行常规检查。
 - 无论 SPDX 结果如何，都检查语言 YAML 改动：允许产品文案源 `locales/zh-CN.yml` 和上游同步源 `locales/ja-JP.yml`，其余语言禁止修改。
 - 检查 `private-assets` 和 `packages/frontend/assets/camp` 的 Git 排除规则，拒绝已进入索引的素材、链接和私有素材子仓库。也可单独运行 `pnpm assets:check`。

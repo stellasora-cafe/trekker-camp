@@ -424,7 +424,7 @@ EOF
 install_dependencies() {
 	local package
 	local missing=()
-	for package in ca-certificates curl git git-lfs openssl tzdata python3; do
+	for package in ca-certificates curl git openssl tzdata python3; do
 		if [[ $(dpkg-query -W -f='${Status}' "$package" 2>/dev/null || true) != 'install ok installed' ]]; then
 			missing+=("$package")
 		fi
@@ -484,7 +484,7 @@ save_github_token() (
 )
 
 github_git() {
-	LC_ALL=C CAMP_GH_TOKEN="$github_token" GIT_ASKPASS="$auth_dir/askpass" GIT_TERMINAL_PROMPT=0 GIT_LFS_SKIP_SMUDGE=1 \
+	LC_ALL=C CAMP_GH_TOKEN="$github_token" GIT_ASKPASS="$auth_dir/askpass" GIT_TERMINAL_PROMPT=0 \
 		git -c credential.helper= "$@"
 }
 
@@ -552,7 +552,7 @@ sync_checkout() {
 	# Use the canonical owner before authentication; do not rely on a redirect.
 	github_git -C "$directory" fetch --no-tags "$repository" refs/heads/master:refs/remotes/origin/master
 	git -C "$directory" merge-base --is-ancestor HEAD origin/master || fail "$directory 存在未发布提交或分叉，部署已停止。"
-	GIT_LFS_SKIP_SMUDGE=1 git -C "$directory" merge --ff-only origin/master
+	git -C "$directory" merge --ff-only origin/master
 	git -C "$directory" remote set-url origin "$repository"
 }
 
@@ -1083,15 +1083,12 @@ main() {
 	stage='同步私有素材'
 	install -d -m 0755 "$data_dir"
 	sync_checkout "$assets_dir" https://github.com/stellasora-cafe/trekker-camp-assets.git
-	git -C "$assets_dir" lfs install --local --skip-smudge
-	github_git -C "$assets_dir" lfs pull --include='public/**' --exclude=
 	[[ -d $assets_dir/public ]] || fail '素材仓库缺少 public/ 目录。'
 	chmod -R a+rX "$assets_dir/public"
 	if [[ $action == install ]]; then
 		stage='生成首次部署配置'
 		create_configuration
 	fi
-	# Persist only after Git and LFS have successfully read the private assets.
 	stage='保存 GitHub PAT'
 	save_github_token
 	install -d -m 0700 "$backup_root"

@@ -226,15 +226,15 @@ prepare_auth
                 self.assertNotIn(token, result.stdout + result.stderr)
 
     @unittest.skipUnless(os.geteuid() == 0, "CLI entry point requires root")
-    def test_update_saves_pat_only_after_private_git_and_lfs_succeed(self):
+    def test_update_saves_pat_only_after_assets_sync_succeeds(self):
         data_dir = self.root / "data disk"
         self.configuration(data_dir)
-        (data_dir / "private-assets/public").mkdir(parents=True)
         saved = data_dir / ".config/github-token"
         saved.write_text("github_pat_previous_read_only\n")
         self.env["GH_TOKEN"] = GITHUB_TEST_PAT
-        for failure in ("private-git", "lfs", ""):
+        for failure in ("private-git", "missing-public", ""):
             with self.subTest(failure=failure):
+                (data_dir / "private-assets/public").mkdir(parents=True, exist_ok=True)
                 self.env["TEST_AUTH_FAILURE"] = failure
                 result = self.shell('''
 detect_ubuntu() { :; }
@@ -245,9 +245,7 @@ prepare_release() { :; }
 sync_checkout() {
   [[ $github_token == "$TEST_GITHUB_PAT" ]]
   [[ $1 != "$assets_dir" || $TEST_AUTH_FAILURE != private-git ]]
-}
-git() {
-  if [[ $* == *'lfs pull'* && $TEST_AUTH_FAILURE == lfs ]]; then return 42; fi
+  if [[ $TEST_AUTH_FAILURE == missing-public ]]; then rmdir "$assets_dir/public"; fi
 }
 deploy() { printf 'deployment-dispatched\\n'; }
 main update --dir "$TEST_ROOT/checkout"
@@ -295,26 +293,23 @@ main update --dir "$TEST_ROOT/checkout"
         self.sync(success=False)
         self.assertEqual((checkout / "keep").read_text(), "existing data")
 
-    def test_lfs_downloads_public_content_and_leaves_checkout_clean(self):
-        source = self.repository("assets", {".gitattributes": "*.bin filter=lfs diff=lfs merge=lfs -text\n"})
-        self.git(source, "lfs", "install", "--local")
+    def test_git_downloads_binary_assets_and_leaves_checkout_clean(self):
+        source = self.repository("assets", {".gitattributes": "*.bin binary\n"})
         for name in ("public/image.bin", "originals/source.bin"):
             target = source / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(b"fixture-binary-content\0")
         self.git(source, "add", ".")
-        self.git(source, "commit", "-m", "Add LFS fixtures")
+        self.git(source, "commit", "-m", "Add binary fixtures")
         self.redirect(source, ASSETS_REPO)
         self.shell('''
 github_token=fake-test-token
 auth_dir="$TEST_ROOT"
 sync_checkout "$TEST_ROOT/checkout" https://github.com/stellasora-cafe/trekker-camp-assets.git
-git -C "$TEST_ROOT/checkout" lfs install --local --skip-smudge
-github_git -C "$TEST_ROOT/checkout" lfs pull --include='public/**' --exclude=
 check_checkout "$TEST_ROOT/checkout" https://github.com/stellasora-cafe/trekker-camp-assets.git
 ''')
         self.assertEqual((self.root / "checkout/public/image.bin").read_bytes(), b"fixture-binary-content\0")
-        self.assertTrue((self.root / "checkout/originals/source.bin").read_text().startswith("version https://git-lfs"))
+        self.assertEqual((self.root / "checkout/originals/source.bin").read_bytes(), b"fixture-binary-content\0")
 
     def configuration(self, data_dir=None):
         checkout = self.root / "checkout"

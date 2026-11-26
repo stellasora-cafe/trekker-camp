@@ -12,10 +12,9 @@ import { checkSourceLocation, linkPrivateAssets } from './private-assets.mjs';
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const repositoryUrl = 'https://github.com/stellasora-cafe/trekker-camp-assets.git';
 
-function git(directory, args, options = {}) {
+function git(directory, args) {
 	return execFileSync('git', ['-C', directory, ...args], {
 		encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
-		env: { ...process.env, GIT_LFS_SKIP_SMUDGE: '1' }, ...options,
 	}).trim();
 }
 
@@ -53,7 +52,6 @@ export async function pullPrivateAssets(root = repoRoot, { source = process.env.
 	if (!sameRepository(git(directory, ['remote', 'get-url', 'origin']), repository)) {
 		throw new Error('The artwork origin points to another repository; it was left unchanged.');
 	}
-	if (!initialized) git(directory, ['lfs', 'update']);
 	if (git(directory, ['status', '--porcelain', '--untracked-files=all'])) {
 		throw new Error('Artwork has local changes. Commit or save them before assets:pull; no files were overwritten.');
 	}
@@ -65,7 +63,6 @@ export async function pullPrivateAssets(root = repoRoot, { source = process.env.
 	try { git(directory, ['rev-parse', '--verify', 'HEAD']); } catch { hasHead = false; }
 	if (hasHead) git(directory, ['merge', '--ff-only', 'origin/master']);
 	else git(directory, ['checkout', '-b', 'master', '--track', 'origin/master']);
-	git(directory, ['lfs', 'pull', '--include=public/**', '--exclude=']);
 	const linked = await linkPrivateAssets(root, publicDirectory);
 	return { directory, publicDirectory: linked, revision: git(directory, ['rev-parse', 'HEAD']) };
 }
