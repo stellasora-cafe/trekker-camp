@@ -369,15 +369,15 @@ if (props.mention) {
 	text.value += ' ';
 }
 
-if (replyTargetNote.value && (replyTargetNote.value.user.username !== $i.username || (replyTargetNote.value.user.host != null && replyTargetNote.value.user.host !== host))) {
-	text.value = `@${replyTargetNote.value.user.username}${replyTargetNote.value.user.host != null ? '@' + toASCII(replyTargetNote.value.user.host) : ''} `;
-}
-
 if (replyTargetNote.value && replyTargetNote.value.text != null) {
 	const ast = mfm.parse(replyTargetNote.value.text);
-	const otherHost = replyTargetNote.value.user.host;
+	const replyAuthor = replyTargetNote.value.user;
+	const otherHost = replyAuthor.host;
+	const replyAuthorHost = toASCII((otherHost ?? host).toLowerCase());
 
 	for (const x of extractMentions(ast)) {
+		if (x.username.toLowerCase() === replyAuthor.username.toLowerCase() && toASCII((x.host ?? otherHost ?? host).toLowerCase()) === replyAuthorHost) continue;
+
 		const mention = x.host ?
 			`@${x.username}@${toASCII(x.host)}` :
 			(otherHost == null || otherHost === host) ?
